@@ -34,6 +34,7 @@ namespace Headroom
         readonly DarkTextBox normal = new DarkTextBox();
         readonly DarkTextBox boostDuration = new DarkTextBox();
         readonly DarkTextBox boostInterval = new DarkTextBox();
+        readonly DarkTextBox opacity = new DarkTextBox();
         readonly DarkComboBox topMost   = new DarkComboBox();
         readonly DarkComboBox showCodex  = new DarkComboBox();
         readonly DarkComboBox showClaude = new DarkComboBox();
@@ -177,6 +178,7 @@ namespace Headroom
             AddRow(leftCard, "Language", "Language", "", "", language, ref leftY);
             SetupCombo(topMost, settings.AlwaysOnTop ? "enabled" : "disabled", new[] { T("有効", "Enabled"), T("無効", "Disabled") });
             AddRow(leftCard, "最前面に固定", "Always on top", "", "", topMost, ref leftY);
+            AddNumberRow(leftCard, "透明度 (%)", "Opacity (%)", "", "", opacity, settings.OpacityPercent, ref leftY, 35, 100);
             SetupCombo(showCodex,  settings.ShowCodex  ? "enabled" : "disabled", new[] { T("有効", "Enabled"), T("無効", "Disabled") });
             SetupCombo(showClaude, settings.ShowClaude ? "enabled" : "disabled", new[] { T("有効", "Enabled"), T("無効", "Disabled") });
             AddRow(leftCard, "Codex 表示", "Codex display", "", "", showCodex,  ref leftY);
@@ -189,8 +191,6 @@ namespace Headroom
             AddSection(leftCard, "レイアウト", "Layout", ref leftY);
             AddRow(leftCard, "配置", "Arrangement", "", "", layoutMode, ref leftY);
             AddRow(leftCard, "表示順", "Service order", "先頭のカード", "First card", serviceOrder, ref leftY);
-            AddRow(leftCard, "Codex トークン表示", "Codex token display", "残量 / 使用量", "remaining / used", codexMode, ref leftY);
-            AddRow(leftCard, "Claude トークン表示", "Claude token display", "残量 / 使用量", "remaining / used", claudeMode, ref leftY);
             AddRow(leftCard, "5時間リセット表示", "5h reset display", "", "", fiveResetMode, ref leftY);
             AddRow(leftCard, "週リセット表示", "Weekly reset display", "", "", weeklyResetMode, ref leftY);
 
@@ -557,6 +557,7 @@ namespace Headroom
             StyleNumber(normal, settings.NormalIntervalMinutes, 1, 240);
             StyleNumber(boostDuration, settings.BoostDurationMinutes, 1, 240);
             StyleNumber(boostInterval, settings.BoostIntervalMinutes, 1, 240);
+            StyleNumber(opacity, settings.OpacityPercent, 35, 100);
         }
 
         void StyleNumber(TextBox box, int value, int min, int max)
@@ -692,6 +693,7 @@ namespace Headroom
                 finally { _updatingLanguage = false; }
             };
             normal.TextChanged += apply;
+            opacity.TextChanged += apply;
             language.SelectedIndexChanged += applyLanguage;
             boostDuration.TextChanged += apply;
             boostInterval.TextChanged += apply;
@@ -788,6 +790,7 @@ namespace Headroom
         void ApplyToSettings()
         {
             settings.NormalIntervalMinutes = ReadBoxInt(normal, settings.NormalIntervalMinutes, 1, 240);
+            settings.OpacityPercent = ReadBoxInt(opacity, settings.OpacityPercent, 35, 100);
             settings.Language = language.SelectedIndex == 1 ? "en" : "ja";
             settings.BoostDurationMinutes = ReadBoxInt(boostDuration, settings.BoostDurationMinutes, 1, 240);
             settings.BoostIntervalMinutes = ReadBoxInt(boostInterval, settings.BoostIntervalMinutes, 1, 240);
@@ -798,8 +801,8 @@ namespace Headroom
             settings.CodexLoginMethod = LoginMethodValue(codexLoginMethod.SelectedIndex);
             settings.LayoutMode = layoutMode.SelectedIndex == 1 ? "vertical" : "horizontal";
             settings.ServiceOrder = serviceOrder.SelectedIndex == 1 ? "codex-claude" : "claude-codex";
-            settings.CodexShowUsed = codexMode.SelectedIndex == 1;
-            settings.ClaudeShowUsed = claudeMode.SelectedIndex == 1;
+            settings.CodexShowUsed = false;
+            settings.ClaudeShowUsed = false;
             settings.FiveHourResetMode = fiveResetMode.SelectedIndex == 1 ? "relative" : "time";
             settings.WeeklyResetMode   = weeklyResetMode.SelectedIndex == 1 ? "relative" : "time";
             int warning = ReadBoxInt(warningPercent, settings.WarningRemainingPercent, 1, 99);

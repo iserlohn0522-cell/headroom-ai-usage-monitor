@@ -24,7 +24,28 @@ $ProgramFilesX86 = ${env:ProgramFiles(x86)}
 if (!$ProgramFilesX86) { $ProgramFilesX86 = $env:ProgramFiles }
 $ReferenceAssemblies = Join-Path $ProgramFilesX86 "Reference Assemblies\Microsoft\Framework\.NETFramework\$TargetFramework"
 if (!(Test-Path $ReferenceAssemblies)) {
-  throw ".NET Framework 4.8 reference assemblies not found: $ReferenceAssemblies. Install the .NET Framework 4.8 Developer Pack or Visual Studio Build Tools with the .NET Framework 4.8 targeting pack."
+  $PackageVersion = "1.0.3"
+  $PackageRoot = Join-Path $PSScriptRoot ".packages\Microsoft.NETFramework.ReferenceAssemblies.net48\$PackageVersion"
+  $PackageFile = Join-Path $PackageRoot "package.nupkg"
+  $PackageZip = Join-Path $PackageRoot "package.zip"
+  $PackageContent = Join-Path $PackageRoot "content"
+  $LocalReferenceAssemblies = Join-Path $PackageContent "build\.NETFramework\$TargetFramework"
+
+  if (!(Test-Path $LocalReferenceAssemblies)) {
+    New-Item -ItemType Directory -Force -Path $PackageRoot | Out-Null
+    if (!(Test-Path $PackageFile)) {
+      $PackageUrl = "https://api.nuget.org/v3-flatcontainer/microsoft.netframework.referenceassemblies.net48/$PackageVersion/microsoft.netframework.referenceassemblies.net48.$PackageVersion.nupkg"
+      Invoke-WebRequest $PackageUrl -OutFile $PackageFile
+    }
+    Copy-Item -LiteralPath $PackageFile -Destination $PackageZip -Force
+    if (Test-Path $PackageContent) { Remove-Item -LiteralPath $PackageContent -Recurse -Force }
+    Expand-Archive -LiteralPath $PackageZip -DestinationPath $PackageContent
+  }
+
+  if (!(Test-Path $LocalReferenceAssemblies)) {
+    throw ".NET Framework 4.8 reference assemblies not found. Install the .NET Framework 4.8 Developer Pack or allow build.ps1 to download Microsoft.NETFramework.ReferenceAssemblies.net48."
+  }
+  $ReferenceAssemblies = $LocalReferenceAssemblies
 }
 
 # .NET Framework 4.x uses the CLR 4 toolchain directory name even when targeting 4.8.
@@ -64,7 +85,8 @@ New-Item -ItemType Directory -Force -Path $VersionInfoDir | Out-Null
   /p:Platform=x64 `
   /p:OutDir="$Out\" `
   /p:AssemblyName="$AssemblyName" `
-  /p:HeadroomVersionInfoFile="$VersionInfoFile"
+  /p:HeadroomVersionInfoFile="$VersionInfoFile" `
+  /p:FrameworkPathOverride="$ReferenceAssemblies"
 if ($LASTEXITCODE -ne 0) {
   throw "MSBuild failed with exit code $LASTEXITCODE"
 }

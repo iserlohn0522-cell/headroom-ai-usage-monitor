@@ -30,6 +30,8 @@ namespace Headroom
             var settings = SettingsStore.Load(path, null);
             Equal("en", settings.Language, "default language");
             Equal("claude-codex", settings.ServiceOrder, "default service order");
+            Equal(300, settings.Width, "default width");
+            Equal(124, settings.Height, "default height");
             True(File.Exists(path), "default settings file created");
         }
 
@@ -41,6 +43,8 @@ namespace Headroom
                 "\"height\":200," +
                 "\"language\":\"ja\"," +
                 "\"normalIntervalMinutes\":20," +
+                "\"widgetMode\":\"edge\"," +
+                "\"opacityPercent\":82," +
                 "\"boostDurationMinutes\":40," +
                 "\"boostIntervalMinutes\":2," +
                 "\"alwaysOnTop\":true," +
@@ -61,6 +65,8 @@ namespace Headroom
             Equal(200, settings.Height, "height");
             Equal("ja", settings.Language, "language");
             Equal(20, settings.NormalIntervalMinutes, "normal interval");
+            Equal("edge", settings.WidgetMode, "widget mode");
+            Equal(82, settings.OpacityPercent, "opacity");
             Equal(40, settings.BoostDurationMinutes, "boost duration");
             Equal(2, settings.BoostIntervalMinutes, "boost interval");
             True(settings.AlwaysOnTop, "always on top");
@@ -106,7 +112,7 @@ namespace Headroom
             File.WriteAllText(legacy, "{\"language\":\"ja\",\"width\":888}");
             var settings = SettingsStore.Load(target, legacy);
             Equal("ja", settings.Language, "legacy language");
-            Equal(888, settings.Width, "legacy width");
+            Equal(300, settings.Width, "legacy width migrated");
             True(File.Exists(target), "legacy copied");
         }
 
@@ -116,7 +122,7 @@ namespace Headroom
             File.WriteAllText(path, "{invalid");
             var settings = SettingsStore.Load(path, null);
             Equal("en", settings.Language, "invalid default language");
-            Equal(760, settings.Width, "invalid default width");
+            Equal(300, settings.Width, "invalid default width");
         }
 
         static void True(bool value, string label)

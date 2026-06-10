@@ -9,6 +9,7 @@ x64/
 x86/
 TestResults/
 packages/
+.packages/
 
 # Build artifacts
 *.dll

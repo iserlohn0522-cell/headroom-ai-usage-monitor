@@ -56,6 +56,8 @@ namespace Headroom
         readonly WidgetSettings settings = WidgetSettings.Load();
         readonly ToolTip toolTip = new ToolTip { InitialDelay = 2000, ReshowDelay = 100, ShowAlways = true };
         readonly Timer tooltipTimer = new Timer();
+        readonly NotifyIcon trayIcon = new NotifyIcon();
+        readonly ContextMenuStrip trayMenu = new ContextMenuStrip();
         string pendingTooltipText = "";
         Point pendingTooltipLocation;
 
@@ -66,8 +68,8 @@ namespace Headroom
         DateTime lastClaudeCredNotify = DateTime.MinValue;
         DateTime lastCodexCredNotify = DateTime.MinValue;
         DateTime lastFixtureNotify = DateTime.MinValue;
-        ServiceState claude = new ServiceState("Claude", ClaudeUrl, Color.FromArgb(45, 132, 235));
-        ServiceState codex = new ServiceState("Codex", CodexUrl, Color.FromArgb(26, 177, 92));
+        ServiceState claude = new ServiceState("Claude", ClaudeUrl, Color.FromArgb(215, 154, 101));
+        ServiceState codex = new ServiceState("Codex", CodexUrl, Color.FromArgb(132, 205, 252));
 
         static UsageForm()
         {
@@ -98,7 +100,9 @@ namespace Headroom
             FormBorderStyle = FormBorderStyle.None;
             TopMost = settings.AlwaysOnTop;
             KeyPreview = true;
-            ShowInTaskbar = true;
+            ShowInTaskbar = false;
+            trayIcon.DoubleClick += OnTrayIconDoubleClick;
+            SetupTrayIcon();
 
             claude.ManuallyLoggedOut = settings.ClaudeLoggedOut;
             codex.ManuallyLoggedOut = settings.CodexLoggedOut;
@@ -144,8 +148,8 @@ namespace Headroom
                 UpdateSideRailOpacity();
                 paintSubtick = (paintSubtick + 1) % 6;
                 if (paintSubtick == 0) spinnerFrame = (spinnerFrame + 1) % 4;
-                UpdateBarAnimation(codex,  settings.CodexShowUsed);
-                UpdateBarAnimation(claude, settings.ClaudeShowUsed);
+                UpdateBarAnimation(codex,  false);
+                UpdateBarAnimation(claude, false);
                 RenderLayered();
             };
             paintTimer.Start();
@@ -171,6 +175,8 @@ namespace Headroom
             {
                 try { if (claudeCredWatcher != null) claudeCredWatcher.Dispose(); } catch { }
                 try { if (codexCredWatcher  != null) codexCredWatcher.Dispose();  } catch { }
+                try { trayIcon.Visible = false; trayIcon.Dispose(); } catch { }
+                try { trayMenu.Dispose(); } catch { }
             };
         }
 
@@ -211,7 +217,8 @@ namespace Headroom
 
                 var sz    = new LayeredSize  { cx = Width, cy = Height };
                 var srcPt = new LayeredPoint { X = 0, Y = 0 };
-                var blend = new BlendFunction { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = 255, AlphaFormat = 1 };
+                byte alpha = (byte)Math.Max(35, Math.Min(255, settings.OpacityPercent * 255 / 100));
+                var blend = new BlendFunction { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = alpha, AlphaFormat = 1 };
                 UpdateLayeredWindow(Handle, screenDC, IntPtr.Zero, ref sz, memDC, ref srcPt, 0, ref blend, 2); // ULW_ALPHA
             }
             finally
@@ -645,6 +652,7 @@ namespace Headroom
             {
                 Icon rawIco = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
                 Icon = rawIco;
+                trayIcon.Icon = rawIco;
                 Icon icoSmall = new Icon(rawIco, 16, 16);
                 Icon icoBig   = new Icon(rawIco, 48, 48);
                 SendMessageIcon(Handle, 0x80, new IntPtr(0), icoSmall.Handle);
@@ -652,6 +660,49 @@ namespace Headroom
             }
             catch { }
             RenderLayered();
+        }
+
+        void SetupTrayIcon()
+        {
+            trayMenu.Items.Clear();
+            trayMenu.Items.Add(Visible ? "Hide widget" : "Show widget", null, (s, e) =>
+            {
+                Visible = !Visible;
+                if (Visible) Activate();
+                SetupTrayIcon();
+            });
+            trayMenu.Items.Add(settings.AlwaysOnTop ? "Always on top: On" : "Always on top: Off", null, (s, e) =>
+            {
+                settings.AlwaysOnTop = !settings.AlwaysOnTop;
+                TopMost = settings.AlwaysOnTop;
+                settings.Save();
+                SetupTrayIcon();
+                Invalidate();
+            });
+            trayMenu.Items.Add(string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase) ? "Switch to compact" : "Switch to edge", null, (s, e) =>
+            {
+                settings.WidgetMode = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase) ? "compact" : "edge";
+                ApplyLayoutMinimumSize();
+                ApplyIdealSize();
+                settings.Save();
+                SetupTrayIcon();
+                Invalidate();
+            });
+            trayMenu.Items.Add("Settings", null, async (s, e) => await ShowSettingsDialog());
+            trayMenu.Items.Add("Exit", null, (s, e) => Close());
+
+            trayIcon.Text = "Headroom";
+            if (trayIcon.Icon == null)
+                trayIcon.Icon = Icon ?? SystemIcons.Application;
+            trayIcon.ContextMenuStrip = trayMenu;
+            trayIcon.Visible = true;
+        }
+
+        void OnTrayIconDoubleClick(object sender, EventArgs e)
+        {
+            Visible = true;
+            Activate();
+            SetupTrayIcon();
         }
     }
 }

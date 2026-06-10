@@ -39,15 +39,17 @@ namespace Headroom
                 settings.AlwaysOnTop = !settings.AlwaysOnTop;
                 TopMost = settings.AlwaysOnTop;
                 settings.Save();
+                SetupTrayIcon();
                 Invalidate();
                 return;
             }
-            if (key == "token")
+            if (key == "widgetMode")
             {
-                bool next = !settings.ClaudeShowUsed;
-                settings.ClaudeShowUsed = next;
-                settings.CodexShowUsed  = next;
+                settings.WidgetMode = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase) ? "compact" : "edge";
+                ApplyLayoutMinimumSize();
+                ApplyIdealSize();
                 settings.Save();
+                SetupTrayIcon();
                 Invalidate();
                 return;
             }
@@ -76,14 +78,6 @@ namespace Headroom
                 return;
             }
 
-            if (key.EndsWith("-fiveMode") || key.EndsWith("-weekMode"))
-            {
-                if (key.StartsWith("codex")) settings.CodexShowUsed = !settings.CodexShowUsed;
-                else settings.ClaudeShowUsed = !settings.ClaudeShowUsed;
-                settings.Save();
-                Invalidate();
-                return;
-            }
             if (key.EndsWith("-fiveResetLabel"))
             {
                 settings.FiveHourResetMode = string.Equals(settings.FiveHourResetMode, "relative", StringComparison.OrdinalIgnoreCase) ? "time" : "relative";
@@ -116,7 +110,7 @@ namespace Headroom
         {
             if (key == "close") return T("閉じる", "Close");
             if (key == "pin") return T(settings.AlwaysOnTop ? "最前面を解除" : "最前面に固定", settings.AlwaysOnTop ? "Unpin from top" : "Always on top");
-            if (key == "token") return T(settings.ClaudeShowUsed ? "残量表示に切り替え" : "使用量表示に切り替え", settings.ClaudeShowUsed ? "Switch to remaining" : "Switch to used");
+            if (key == "widgetMode") return string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase) ? "Compact view" : "Edge view";
             if (key == "fiveReset") return T(string.Equals(settings.FiveHourResetMode, "relative", StringComparison.OrdinalIgnoreCase) ? "5時間リセット: カウントダウン→時刻表示" : "5時間リセット: 時刻→カウントダウン表示", string.Equals(settings.FiveHourResetMode, "relative", StringComparison.OrdinalIgnoreCase) ? "5h reset: countdown → clock time" : "5h reset: clock time → countdown");
             if (key == "weekReset") return T(string.Equals(settings.WeeklyResetMode, "relative", StringComparison.OrdinalIgnoreCase) ? "週リセット: カウントダウン→時刻表示" : "週リセット: 時刻→カウントダウン表示", string.Equals(settings.WeeklyResetMode, "relative", StringComparison.OrdinalIgnoreCase) ? "Weekly reset: countdown → clock time" : "Weekly reset: clock time → countdown");
             if (key == "settings") return T("設定", "Settings");
@@ -288,6 +282,7 @@ namespace Headroom
                     if (layoutChanged || dlg.ResetRequested) ApplyIdealSize();
                     TopMost = settings.AlwaysOnTop;
                     settings.Save();
+                    SetupTrayIcon();
                 }
                 if (dlg.LoginClaude) await OpenLoginAsync(claude);
                 if (dlg.LoginCodex)  await OpenLoginAsync(codex);

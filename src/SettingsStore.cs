@@ -33,6 +33,7 @@ namespace Headroom
                     return settings;
                 }
 
+                bool missingWidgetMode = string.IsNullOrEmpty(Json.String(root, "widgetMode"));
                 settings.Width = ReadInt(root, "width", settings.Width);
                 settings.Height = ReadInt(root, "height", settings.Height);
                 settings.Language = ReadString(root, "language", settings.Language);
@@ -56,6 +57,12 @@ namespace Headroom
                 settings.WeeklyResetMode = NormalizeResetMode(ReadString(root, "weeklyResetMode", settings.WeeklyResetMode));
                 settings.WarningRemainingPercent = ReadInt(root, "warningRemainingPercent", settings.WarningRemainingPercent);
                 settings.CriticalRemainingPercent = ReadInt(root, "criticalRemainingPercent", settings.CriticalRemainingPercent);
+                if (missingWidgetMode)
+                {
+                    settings.Width = 300;
+                    settings.Height = 124;
+                    Save(targetPath, settings);
+                }
             }
             catch (Exception ex)
             {

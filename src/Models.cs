@@ -102,8 +102,8 @@ namespace Headroom
 
     sealed class WidgetSettings
     {
-        public int Width = 760;
-        public int Height = 170;
+        public int Width = 300;
+        public int Height = 124;
         public string Language = DefaultLanguage();
         public int NormalIntervalMinutes = 5;
         public int BoostDurationMinutes = 30;

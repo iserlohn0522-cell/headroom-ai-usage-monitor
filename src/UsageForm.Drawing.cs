@@ -24,29 +24,9 @@ namespace Headroom
             hits.Clear();
             silentHits.Clear();
 
-            int y = 0;
-            int gap = 10;
-            int sideRail = 16;
-            var visible = VisibleServices();
-            int railLeft = ClientSize.Width - sideRail - 14;
-            int contentW = Math.Max(240, railLeft);
-            int contentH = Math.Max(110, ClientSize.Height);
-            if (visible.Count == 1)
-            {
-                DrawService(g, visible[0].Item1, 0, y, contentW, contentH, visible[0].Item2);
-            }
-            else if (string.Equals(settings.LayoutMode, "vertical", StringComparison.OrdinalIgnoreCase))
-            {
-                int cardH = Math.Max(110, (contentH - gap) / 2);
-                DrawService(g, visible[0].Item1, 0, y, contentW, cardH, visible[0].Item2);
-                DrawService(g, visible[1].Item1, 0, y + cardH + gap, contentW, cardH, visible[1].Item2);
-            }
-            else
-            {
-                int cardW = Math.Max(240, (contentW - gap) / 2);
-                DrawService(g, visible[0].Item1, 0, y, cardW, contentH, visible[0].Item2);
-                DrawService(g, visible[1].Item1, cardW + gap, y, cardW, contentH, visible[1].Item2);
-            }
+            settings.CodexShowUsed = false;
+            settings.ClaudeShowUsed = false;
+            DrawCustomBatteryWidget(g);
             if (sideRailOpacity > 0.01)
                 DrawSideRail(g);
         }
@@ -71,23 +51,25 @@ namespace Headroom
 
         void ApplyLayoutMinimumSize()
         {
-            bool vertical = string.Equals(settings.LayoutMode, "vertical", StringComparison.OrdinalIgnoreCase);
-            bool twoServices = settings.ShowClaude && settings.ShowCodex;
-            if (twoServices && vertical)  MinimumSize = new Size(270, 250);
-            else if (twoServices)         MinimumSize = new Size(520, 154);
-            else                          MinimumSize = new Size(270, 154);
+            bool edge = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
+            MinimumSize = edge ? new Size(210, 168) : new Size(260, 108);
             if (Width < MinimumSize.Width) Width = MinimumSize.Width;
             if (Height < MinimumSize.Height) Height = MinimumSize.Height;
         }
 
         void ApplyIdealSize()
         {
-            bool vertical = string.Equals(settings.LayoutMode, "vertical", StringComparison.OrdinalIgnoreCase);
-            bool twoServices = settings.ShowClaude && settings.ShowCodex;
             int idealW, idealH;
-            if      (twoServices && !vertical) { idealW = 760; idealH = 154; }
-            else if (twoServices)              { idealW = 390; idealH = 318; }
-            else                               { idealW = 390; idealH = 154; }
+            if (string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase))
+            {
+                idealW = 240;
+                idealH = 190;
+            }
+            else
+            {
+                idealW = 300;
+                idealH = 124;
+            }
             Width  = Math.Max(MinimumSize.Width,  idealW);
             Height = Math.Max(MinimumSize.Height, idealH);
             settings.Width  = Width;
@@ -99,16 +81,14 @@ namespace Headroom
             int x         = ClientSize.Width - 24;
             int closeY    = 4;
             int pinY      = 30;
-            int tokenY    = 56;
-            int fiveY     = 82;
-            int weekY     = 108;
-            int settingsY = 134;
+            int fiveY     = 56;
+            int weekY     = 82;
+            int settingsY = 108;
 
             RegisterSideRailHits();
 
             DrawIconButton(g, "close",     x, closeY,    Color.FromArgb(160, 160, 165), DrawCloseIcon);
             DrawIconButton(g, "pin",       x, pinY,      settings.AlwaysOnTop ? Color.FromArgb(100, 180, 255) : Color.FromArgb(100, 100, 105), DrawPinIcon);
-            DrawIconButton(g, "token",     x, tokenY,    Color.FromArgb(130, 145, 165), DrawTokenToggleIcon);
             DrawIconButton(g, "fiveReset", x, fiveY,     Color.FromArgb(110, 125, 145), DrawFiveResetIcon);
             DrawIconButton(g, "weekReset", x, weekY,     Color.FromArgb(110, 125, 145), DrawWeekResetIcon);
             DrawIconButton(g, "settings",  x, settingsY, Color.FromArgb(130, 130, 135), DrawGearIcon);
@@ -119,14 +99,12 @@ namespace Headroom
             int x         = ClientSize.Width - 24;
             int closeY    = 4;
             int pinY      = 30;
-            int tokenY    = 56;
-            int fiveY     = 82;
-            int weekY     = 108;
-            int settingsY = 134;
+            int fiveY     = 56;
+            int weekY     = 82;
+            int settingsY = 108;
 
             hits["close"]     = new Rectangle(x - 6, closeY    - 6, 28, 28);
             hits["pin"]       = new Rectangle(x - 6, pinY      - 6, 28, 28);
-            hits["token"]     = new Rectangle(x - 6, tokenY    - 6, 28, 28);
             hits["fiveReset"] = new Rectangle(x - 6, fiveY     - 6, 28, 28);
             hits["weekReset"] = new Rectangle(x - 6, weekY     - 6, 28, 28);
             hits["settings"]  = new Rectangle(x - 6, settingsY - 6, 28, 28);
@@ -154,6 +132,170 @@ namespace Headroom
         {
             int alpha = Math.Max(0, Math.Min(255, (int)Math.Round(color.A * sideRailOpacity)));
             return Color.FromArgb(alpha, color.R, color.G, color.B);
+        }
+
+        void DrawCustomBatteryWidget(Graphics g)
+        {
+            bool edge = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
+            int radius = 8;
+            using (var path = RoundRect(0, 0, Math.Max(1, ClientSize.Width - 1), Math.Max(1, ClientSize.Height - 1), radius))
+            {
+                Color top = edge ? Color.FromArgb(28, 31, 37) : Color.FromArgb(24, 27, 32);
+                Color bottom = edge ? Color.FromArgb(18, 20, 24) : Color.FromArgb(17, 20, 24);
+                using (var grad = new System.Drawing.Drawing2D.LinearGradientBrush(ClientRectangle, top, bottom, 90f))
+                    g.FillPath(grad, path);
+                using (var border = new Pen(Color.FromArgb(65, 72, 82), 0.9f))
+                    g.DrawPath(border, path);
+            }
+
+            DrawModeToggle(g, edge ? "-" : "+");
+
+            int rowCount = CountBatteryRows();
+            if (rowCount == 0) rowCount = 1;
+            int pad = edge ? 10 : 7;
+            int toggleSpace = 28;
+            int rowGap = edge ? 7 : 3;
+            int totalGap = Math.Max(0, rowCount - 1) * rowGap;
+            int availableH = Math.Max(24, ClientSize.Height - pad * 2 - totalGap);
+            int rowH = Math.Max(edge ? 30 : 21, availableH / rowCount);
+            int rowW = Math.Max(160, ClientSize.Width - pad * 2 - toggleSpace);
+            int y = pad;
+
+            if (settings.ShowCodex)
+            {
+                DrawBatteryRow(g, "5h", codex, false, pad, y, rowW, rowH, BatteryColor(codex.Data.FiveHourRemainingPercent(), CodexFiveColor()), edge);
+                y += rowH + rowGap;
+                DrawBatteryRow(g, "7d", codex, true, pad, y, rowW, rowH, BatteryColor(codex.Data.WeeklyRemainingPercent(), CodexWeekColor()), edge);
+                y += rowH + rowGap;
+            }
+            if (settings.ShowClaude)
+            {
+                DrawBatteryRow(g, "5h", claude, false, pad, y, rowW, rowH, BatteryColor(claude.Data.FiveHourRemainingPercent(), ClaudeFiveColor()), edge);
+                y += rowH + rowGap;
+                DrawBatteryRow(g, "7d", claude, true, pad, y, rowW, rowH, BatteryColor(claude.Data.WeeklyRemainingPercent(), ClaudeWeekColor()), edge);
+            }
+        }
+
+        int CountBatteryRows()
+        {
+            int count = 0;
+            if (settings.ShowCodex) count += 2;
+            if (settings.ShowClaude) count += 2;
+            return count;
+        }
+
+        Color CodexFiveColor() { return Color.FromArgb(132, 205, 252); }
+        Color CodexWeekColor() { return Color.FromArgb(31, 101, 214); }
+        Color ClaudeFiveColor() { return Color.FromArgb(215, 154, 101); }
+        Color ClaudeWeekColor() { return Color.FromArgb(155, 90, 54); }
+
+        Color BatteryColor(int? remaining, Color normal)
+        {
+            if (remaining.HasValue && remaining.Value <= settings.CriticalRemainingPercent)
+                return Color.FromArgb(224, 73, 73);
+            return normal;
+        }
+
+        void DrawModeToggle(Graphics g, string text)
+        {
+            int size = 22;
+            int x = ClientSize.Width - size - 6;
+            int y = 6;
+            hits["widgetMode"] = new Rectangle(x - 4, y - 4, size + 8, size + 8);
+            bool hover = hoverKey == "widgetMode";
+            using (var path = RoundRect(x, y, size, size, 6))
+            using (var bg = new SolidBrush(hover ? Color.FromArgb(50, 58, 70) : Color.FromArgb(32, 37, 45)))
+                g.FillPath(bg, path);
+            using (var f = new Font("Segoe UI", 13f, FontStyle.Bold))
+            using (var b = new SolidBrush(Color.FromArgb(220, 230, 240)))
+            using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                g.DrawString(text, f, b, new RectangleF(x, y - 1, size, size), sf);
+        }
+
+        void DrawBatteryRow(Graphics g, string label, ServiceState service, bool weekly, int x, int y, int w, int h, Color color, bool edge)
+        {
+            int? remaining = weekly ? service.Data.WeeklyRemainingPercent() : service.Data.FiveHourRemainingPercent();
+            double? displayed = weekly ? service.DisplayedWeekPct : service.DisplayedFivePct;
+            string resetRaw = weekly ? service.Data.WeeklyReset : service.Data.FiveHourReset;
+            string reset = CompactResetText(resetRaw, weekly);
+            if (!service.Data.HasAnyValue())
+                reset = service.IsRefreshing ? "updating" : StatusShortText(service.Status ?? service.Data.Status);
+
+            int labelW = edge ? 30 : 24;
+            int pctW = edge ? 42 : 36;
+            int gap = 5;
+            int barX = x + labelW;
+            int barW = Math.Max(64, w - labelW - pctW - gap);
+            int barH = Math.Max(edge ? 17 : 14, h - (edge ? 8 : 5));
+            int barY = y + (h - barH) / 2;
+            string pct = remaining.HasValue ? remaining.Value.ToString(CultureInfo.InvariantCulture) + "%" : "--";
+
+            using (var labelFont = new Font("Segoe UI", edge ? 8.6f : 7.8f, FontStyle.Bold))
+            using (var pctFont = new Font("Segoe UI", edge ? 8.6f : 7.8f, FontStyle.Bold))
+            using (var resetFont = new Font("Segoe UI", edge ? 8.0f : 7.0f, FontStyle.Regular))
+            {
+                TextRenderer.DrawText(g, label, labelFont, new Rectangle(x, y, labelW, h), Color.FromArgb(196, 204, 214), TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding);
+                DrawBatteryBar(g, barX, barY, barW, barH, displayed.HasValue ? displayed : remaining, color, reset, resetFont);
+                TextRenderer.DrawText(g, pct, pctFont, new Rectangle(barX + barW + gap, y, pctW, h), Color.FromArgb(232, 238, 245), TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.NoPadding);
+            }
+        }
+
+        string CompactResetText(string raw, bool weekly)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            string mode = weekly ? "time" : "relative";
+            string text = ResetText(raw, mode, English, weekly);
+            return text.Replace("Reset in ", "")
+                       .Replace("Reset ", "")
+                       .Replace("リセットまで ", "")
+                       .Replace("リセット ", "")
+                       .Trim();
+        }
+
+        string StatusShortText(string status)
+        {
+            switch (status)
+            {
+                case "login_required": return "login";
+                case "login_pending": return "signing in";
+                case "rate_limited": return "wait";
+                case "fetch_error": return "error";
+                case "starting": return "starting";
+                case "updating": return "updating";
+                default: return string.IsNullOrWhiteSpace(status) ? "no data" : status;
+            }
+        }
+
+        void DrawBatteryBar(Graphics g, int x, int y, int w, int h, double? pct, Color color, string reset, Font resetFont)
+        {
+            using (var outline = RoundRect(x, y, w, h, 5))
+            using (var bg = new SolidBrush(Color.FromArgb(16, 19, 23)))
+            using (var pen = new Pen(Color.FromArgb(165, color), 1.4f))
+            {
+                g.FillPath(bg, outline);
+                g.DrawPath(pen, outline);
+            }
+
+            using (var nub = new SolidBrush(Color.FromArgb(165, color)))
+                g.FillRectangle(nub, x + w, y + Math.Max(2, h / 3), 3, Math.Max(4, h / 3));
+
+            if (pct.HasValue)
+            {
+                double clamped = Math.Max(0, Math.Min(100, pct.Value));
+                int fillW = Math.Max(clamped <= 0 ? 0 : 4, (int)Math.Round((w - 4) * clamped / 100.0));
+                if (fillW > 0)
+                {
+                    using (var fillPath = RoundRect(x + 2, y + 2, fillW, h - 4, 3))
+                    using (var fill = new SolidBrush(Color.FromArgb(220, color)))
+                        g.FillPath(fill, fillPath);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(reset))
+            {
+                Color resetColor = Color.FromArgb(226, 238, 242, 248);
+                TextRenderer.DrawText(g, reset, resetFont, new Rectangle(x + 6, y, w - 12, h), resetColor, TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+            }
         }
 
         void DrawService(Graphics g, ServiceState state, int x, int y, int w, int h, string keyPrefix)
