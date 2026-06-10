@@ -40,9 +40,11 @@ namespace Headroom
                 settings.BoostDurationMinutes = ReadInt(root, "boostDurationMinutes", settings.BoostDurationMinutes);
                 settings.BoostIntervalMinutes = ReadInt(root, "boostIntervalMinutes", settings.BoostIntervalMinutes);
                 settings.AlwaysOnTop = ReadBool(root, "alwaysOnTop", settings.AlwaysOnTop);
+                settings.OpacityPercent = ClampOpacity(ReadInt(root, "opacityPercent", settings.OpacityPercent));
                 settings.ShowCodex = ReadBool(root, "showCodex", settings.ShowCodex);
                 settings.ShowClaude = ReadBool(root, "showClaude", settings.ShowClaude);
                 settings.LayoutMode = NormalizeLayoutMode(ReadString(root, "layoutMode", settings.LayoutMode));
+                settings.WidgetMode = NormalizeWidgetMode(ReadString(root, "widgetMode", settings.WidgetMode));
                 settings.ServiceOrder = NormalizeServiceOrder(ReadString(root, "serviceOrder", settings.ServiceOrder));
                 settings.CodexShowUsed = ReadBool(root, "codexShowUsed", settings.CodexShowUsed);
                 settings.ClaudeShowUsed = ReadBool(root, "claudeShowUsed", settings.ClaudeShowUsed);
@@ -75,9 +77,11 @@ namespace Headroom
                     { "boostDurationMinutes", settings.BoostDurationMinutes },
                     { "boostIntervalMinutes", settings.BoostIntervalMinutes },
                     { "alwaysOnTop", settings.AlwaysOnTop },
+                    { "opacityPercent", settings.OpacityPercent },
                     { "showCodex", settings.ShowCodex },
                     { "showClaude", settings.ShowClaude },
                     { "layoutMode", settings.LayoutMode },
+                    { "widgetMode", settings.WidgetMode },
                     { "serviceOrder", settings.ServiceOrder },
                     { "codexShowUsed", settings.CodexShowUsed },
                     { "claudeShowUsed", settings.ClaudeShowUsed },
@@ -124,6 +128,16 @@ namespace Headroom
         static string NormalizeLayoutMode(string value)
         {
             return string.Equals(value, "vertical", StringComparison.OrdinalIgnoreCase) ? "vertical" : "horizontal";
+        }
+
+        static string NormalizeWidgetMode(string value)
+        {
+            return string.Equals(value, "edge", StringComparison.OrdinalIgnoreCase) ? "edge" : "compact";
+        }
+
+        static int ClampOpacity(int value)
+        {
+            return Math.Max(35, Math.Min(100, value));
         }
 
         static string NormalizeServiceOrder(string value)

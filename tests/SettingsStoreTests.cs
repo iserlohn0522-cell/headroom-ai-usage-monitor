@@ -13,6 +13,7 @@ namespace Headroom
             {
                 TestMissingFileCreatesDefault(dir);
                 TestLoadsJsonValues(dir);
+                TestCustomWidgetDefaultsAndModeRoundTrip(dir);
                 TestLegacyMigration(dir);
                 TestInvalidJsonFallsBack(dir);
                 Console.WriteLine("SettingsStoreTests: passed");
@@ -78,6 +79,24 @@ namespace Headroom
             SettingsStore.Save(path, settings);
             var saved = SettingsStore.Load(path, null);
             Equal(777, saved.Width, "saved width");
+        }
+
+        static void TestCustomWidgetDefaultsAndModeRoundTrip(string dir)
+        {
+            string path = Path.Combine(dir, "custom", "settings.json");
+            var loaded = SettingsStore.Load(path, null);
+            Equal(5, loaded.NormalIntervalMinutes, "normal interval default");
+            Equal("compact", loaded.WidgetMode, "widget mode default");
+            True(loaded.AlwaysOnTop, "always on top default");
+            Equal(94, loaded.OpacityPercent, "opacity default");
+
+            loaded.WidgetMode = "edge";
+            loaded.OpacityPercent = 82;
+            SettingsStore.Save(path, loaded);
+
+            var reloaded = SettingsStore.Load(path, null);
+            Equal("edge", reloaded.WidgetMode, "widget mode round trip");
+            Equal(82, reloaded.OpacityPercent, "opacity round trip");
         }
 
         static void TestLegacyMigration(string dir)

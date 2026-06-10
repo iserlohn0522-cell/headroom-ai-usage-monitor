@@ -22,10 +22,10 @@ namespace Headroom
             var settings = new WidgetSettings();
             var svc = Service("Codex", 25, 40);
 
-            svc.LastRefresh = now.AddMinutes(-14);
+            svc.LastRefresh = now.AddMinutes(-4);
             True(!RefreshPolicy.Evaluate(svc, settings, now).ShouldRefresh, "normal not due");
 
-            svc.LastRefresh = now.AddMinutes(-15);
+            svc.LastRefresh = now.AddMinutes(-5);
             True(RefreshPolicy.Evaluate(svc, settings, now).ShouldRefresh, "normal due");
 
             svc.BoostUntil = now.AddMinutes(10);
@@ -47,7 +47,7 @@ namespace Headroom
             var svc = Service("Claude", 100, 40);
 
             svc.Data.FiveHourReset = "2026/5/22 10:08";
-            Equal(TimeSpan.FromMinutes(15), RefreshPolicy.DueInterval(svc, settings, now), "pre reset normal due");
+            Equal(TimeSpan.FromMinutes(5), RefreshPolicy.DueInterval(svc, settings, now), "pre reset normal due");
             True(!RefreshPolicy.IsNearOrRecentReset(svc.Data, now), "pre reset does not poll");
 
             svc.Data.FiveHourReset = "2026/5/22 10:00";
@@ -56,7 +56,7 @@ namespace Headroom
 
             svc = Service("Claude", 25, 40);
             svc.Data.WeeklyReset = "2026/5/22 10:08";
-            Equal(TimeSpan.FromMinutes(15), RefreshPolicy.DueInterval(svc, settings, now), "weekly pre reset normal due without exhaustion");
+            Equal(TimeSpan.FromMinutes(5), RefreshPolicy.DueInterval(svc, settings, now), "weekly pre reset normal due without exhaustion");
             True(!RefreshPolicy.IsNearOrRecentReset(svc.Data, now), "weekly pre reset does not poll without exhaustion");
 
             svc.Data.WeeklyReset = "2026/5/22 10:00";
