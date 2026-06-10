@@ -9,6 +9,14 @@
 
 Headroom is a compact Windows desktop AI usage monitor for Claude Code and Codex. It shows remaining quota, used quota, reset times, login state, and rate-limit status in a small always-on-top widget.
 
+This fork is customized as a personal desktop quota widget. It always shows remaining quota, uses compact battery bars, and provides two display modes: a minimal stacked view and a slightly larger edge view. The `+` button expands to edge view, and the `-` button returns to compact view.
+
+Launch behavior: unzip the release package and double-click `Headroom.exe`. The app runs as a normal Windows desktop app with a tray icon; no terminal needs to stay open. The widget is always-on-top by default and can be adjusted from the tray menu or Settings.
+
+Refresh policy: the normal usage API refresh interval is 5 minutes. The widget may poll more frequently around reset boundaries so the display updates quickly. Usage API refreshes do not consume Claude Code or Codex conversation tokens, but the app still respects API rate limits and backs off on HTTP 429.
+
+Security posture: the app reads existing local CLI credential files and does not copy access tokens into settings. It does not upload telemetry, analytics, usage data, account IDs, or tokens. Settings contain UI preferences and refresh behavior only.
+
 ## Features
 
 - **Side-by-side usage monitoring** — Claude Code and Codex, both 5-hour and weekly quotas, in one floating widget
