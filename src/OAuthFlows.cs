@@ -62,7 +62,7 @@ namespace Headroom
             }
         }
 
-        public static async Task<string> WaitForCallbackAsync(HttpListener listener, string expectedState, int timeoutMs)
+        public static async Task<string> WaitForCallbackAsync(HttpListener listener, string expectedState, int timeoutMs, bool english)
         {
             Task<HttpListenerContext> getCtx = listener.GetContextAsync();
             Task delay = Task.Delay(timeoutMs);
@@ -85,8 +85,12 @@ namespace Headroom
                 if (values.ContainsKey("code") && error == null) code = values["code"];
 
                 string body = error == null
-                    ? "<!doctype html><html lang='ja'><head><meta charset='utf-8'><title>Headroom</title></head><body style='font-family:Segoe UI,sans-serif;text-align:center;padding-top:80px;color:#222;'><h2>Headroom ログイン完了</h2><p>このタブを閉じてください。</p></body></html>"
-                    : "<!doctype html><html lang='ja'><head><meta charset='utf-8'><title>Headroom</title></head><body style='font-family:Segoe UI,sans-serif;text-align:center;padding-top:80px;color:#b00;'><h2>Headroom ログイン失敗</h2><p>" + WebUtility.HtmlEncode(error) + "</p></body></html>";
+                    ? (english
+                        ? "<!doctype html><html lang='en'><head><meta charset='utf-8'><title>Headroom</title></head><body style='font-family:Segoe UI,sans-serif;text-align:center;padding-top:80px;color:#222;'><h2>Headroom sign-in complete</h2><p>You can close this tab.</p></body></html>"
+                        : "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><title>Headroom</title></head><body style='font-family:Microsoft YaHei UI,Segoe UI,sans-serif;text-align:center;padding-top:80px;color:#222;'><h2>Headroom 登录完成</h2><p>现在可以关闭此页面。</p></body></html>")
+                    : (english
+                        ? "<!doctype html><html lang='en'><head><meta charset='utf-8'><title>Headroom</title></head><body style='font-family:Segoe UI,sans-serif;text-align:center;padding-top:80px;color:#b00;'><h2>Headroom sign-in failed</h2><p>" + WebUtility.HtmlEncode(error) + "</p></body></html>"
+                        : "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><title>Headroom</title></head><body style='font-family:Microsoft YaHei UI,Segoe UI,sans-serif;text-align:center;padding-top:80px;color:#b00;'><h2>Headroom 登录失败</h2><p>" + WebUtility.HtmlEncode(error) + "</p></body></html>");
                 byte[] buf = System.Text.Encoding.UTF8.GetBytes(body);
                 ctx.Response.ContentType = "text/html; charset=utf-8";
                 ctx.Response.ContentLength64 = buf.Length;
@@ -125,7 +129,7 @@ namespace Headroom
         const string TokenUrl = "https://console.anthropic.com/v1/oauth/token";
         const string Scopes = "user:inference user:profile";
 
-        public static async Task<bool> StartAsync(HttpClient httpClient, string credentialPath)
+        public static async Task<bool> StartAsync(HttpClient httpClient, string credentialPath, bool english)
         {
             string verifier = OAuthPkce.GenerateVerifier();
             string challenge = OAuthPkce.GenerateChallenge(verifier);
@@ -155,7 +159,7 @@ namespace Headroom
 
             if (!OpenBrowser(authorizeUrl, listener, "claude-pkce-error.txt")) return false;
             string authCode;
-            try { authCode = await LocalOAuthCallbackListener.WaitForCallbackAsync(listener, state, TimeoutMs); }
+            try { authCode = await LocalOAuthCallbackListener.WaitForCallbackAsync(listener, state, TimeoutMs, english); }
             catch (Exception ex) { DebugLog.Write("claude-pkce-error.txt", "callback: " + ex); return false; }
             finally { try { listener.Close(); } catch { } }
 
@@ -232,7 +236,7 @@ namespace Headroom
         const int DefaultPort = 1455;
         const int FallbackPort = 1457;
 
-        public static async Task<bool> StartAsync(HttpClient httpClient, string credentialPath)
+        public static async Task<bool> StartAsync(HttpClient httpClient, string credentialPath, bool english)
         {
             string verifier = OAuthPkce.GenerateVerifier();
             string challenge = OAuthPkce.GenerateChallenge(verifier);
@@ -266,7 +270,7 @@ namespace Headroom
 
             if (!OpenBrowser(authorizeUrl, listener, "codex-pkce-error.txt")) return false;
             string authCode;
-            try { authCode = await LocalOAuthCallbackListener.WaitForCallbackAsync(listener, state, TimeoutMs); }
+            try { authCode = await LocalOAuthCallbackListener.WaitForCallbackAsync(listener, state, TimeoutMs, english); }
             catch (Exception ex) { DebugLog.Write("codex-pkce-error.txt", "callback: " + ex); return false; }
             finally { try { listener.Close(); } catch { } }
 

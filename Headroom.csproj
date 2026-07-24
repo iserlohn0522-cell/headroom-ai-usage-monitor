@@ -8,6 +8,7 @@
     <AssemblyName Condition="'$(AssemblyName)' == ''">Headroom</AssemblyName>
     <RootNamespace>Headroom</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">

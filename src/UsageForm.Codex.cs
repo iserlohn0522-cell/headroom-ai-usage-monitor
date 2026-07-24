@@ -84,7 +84,7 @@ namespace Headroom
 
         async Task<bool> StartCodexPkceLoginAsync(ServiceState service)
         {
-            return await CodexBrowserLoginFlow.StartAsync(httpClient, CodexCredentialPath);
+            return await CodexBrowserLoginFlow.StartAsync(httpClient, CodexCredentialPath, English);
         }
 
     }

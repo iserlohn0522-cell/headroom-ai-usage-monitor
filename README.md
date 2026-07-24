@@ -1,17 +1,17 @@
-[**English**] · [日本語](README.ja.md)
-
 # Headroom — AI Usage Monitor for Claude Code & Codex
 
 
-[![Platform](https://img.shields.io/badge/Platform-Windows-0078D4)](https://github.com/tesuheee/headroom-ai-usage-monitor)
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D4)](https://github.com/iserlohn0522-cell/headroom-ai-usage-monitor)
 [![Language](https://img.shields.io/badge/Language-C%23-239120)](https://learn.microsoft.com/dotnet/csharp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Headroom is a compact Windows desktop AI usage monitor for Claude Code and Codex. It shows remaining quota, used quota, reset times, login state, and rate-limit status in a small always-on-top widget.
+Headroom is a compact Windows desktop AI usage monitor for Claude Code and Codex. It shows the remaining 5-hour and weekly quotas in a small always-on-top widget.
 
-This fork is customized as a personal desktop quota widget. It always shows remaining quota, uses compact battery bars, and provides two display modes: a minimal stacked view and a slightly larger edge view. The `+` button expands to edge view, and the `-` button returns to compact view.
+This fork is customized as a personal desktop quota widget. It has a genuinely small compact mode and a wider detailed mode. The panel surface keeps only three clear controls: pin, mode switch, and refresh all.
 
-Launch behavior: unzip the release package and double-click `Headroom.exe`. The app runs as a normal Windows desktop app with a tray icon; no terminal needs to stay open. The widget is always-on-top by default and can be adjusted from the tray menu or Settings.
+When the pointer leaves the widget, it can collapse into a quota ball. Four colored arcs represent the Claude 5-hour/weekly and Codex 5-hour/weekly quotas; hovering the ball restores the panel. A quota ball near an outer desktop edge can retract so that only a small colored handle remains.
+
+The UI supports Simplified Chinese and English, with Simplified Chinese as the new-install default. Older Japanese UI preferences migrate to Simplified Chinese; Japanese reset-time input remains supported for API compatibility.
 
 Refresh policy: the normal usage API refresh interval is 5 minutes. The widget may poll more frequently around reset boundaries so the display updates quickly. Usage API refreshes do not consume Claude Code or Codex conversation tokens, but the app still respects API rate limits and backs off on HTTP 429.
 
@@ -19,8 +19,11 @@ Security posture: the app reads existing local CLI credential files and does not
 
 ## Features
 
-- **Side-by-side usage monitoring** — Claude Code and Codex, both 5-hour and weekly quotas, in one floating widget
-- **Flexible display** — per-service Remaining / Used switch, wide or tall layout, Claude / Codex service order, reset shown as countdown or clock time
+- **Compact monitoring** — Claude Code and Codex 5-hour and weekly remaining quotas in one small widget
+- **Two useful sizes** — compact `232×94` default and a roomier detailed view
+- **Quota ball and edge hide** — idle collapse, hover restore, and a four-segment quota ring
+- **Chinese and English UI** — localized panel tooltips, tray menu, settings, status, login, and OAuth completion pages
+- **Full settings from the tray** — quick tray controls for opacity, overall scale, service visibility, and auto-hide, plus detailed text, quota-bar, button, and ball sizing
 - **Low-quota warnings** — each quota row turns yellow or red at configurable thresholds
 - **Account controls** — log in or log out of Claude Code / Codex from the Settings dialog
 - **OAuth-aware status** — reads CLI-compatible credentials, refreshes tokens, and backs off when the usage API returns rate limits
@@ -47,72 +50,42 @@ winget install --id Microsoft.DotNet.Framework.DeveloperPack_4 --version 4.8 --s
 
 ## Getting Started
 
-1. Download the latest versioned `Headroom-vX.Y.Z.zip` from [Releases](https://github.com/tesuheee/headroom-ai-usage-monitor/releases) and unzip anywhere.
-2. Run `Headroom.exe`.
-3. On first launch, click **Login** on each card.
+1. Download the latest versioned `Headroom-vX.Y.Z.zip` from [Releases](https://github.com/iserlohn0522-cell/headroom-ai-usage-monitor/releases) and unzip it.
+2. Run the versioned `Headroom-vX.Y.Z.exe`.
+3. On first launch, right-click the tray icon and open **Settings… → Account**, then click **Login** for each service.
    - By default, Headroom uses its built-in Browser OAuth flow. After signing in, the tab shows "Login complete" and Headroom picks up the new credentials automatically.
    - You can switch each service to **CLI** or **Auto** from **Settings → Account**. Auto uses the CLI when available and falls back to Browser OAuth.
    - For Claude CLI login, type `/login` in the opened terminal. Codex CLI starts `codex login` directly.
-   You can also log out and manage sessions from **Settings → Account**.
+   - You can also log out and manage sessions from **Settings → Account**.
 
-## Screens
+## Widget behavior
 
-### Both services, horizontal (default)
-
-![Overview](docs/images/01-overview.png)
-
-### Single service
-
-![Single service](docs/images/02-single-service.png)
-
-Disable a service from **Settings → General** to compact down to one card.
-
-### Vertical layout
-
-![Vertical layout](docs/images/03-layout-vertical.png)
-
-Switch between wide and tall layouts and choose the Claude / Codex service order from **Settings → Layout**.
-
-### Display modes
-
-![Display modes](docs/images/04-display-modes.png)
-
-Each service has its own **Remaining / Used** switch. Reset can be a countdown ("3h 53m left") or an absolute clock time ("5/25 0:59"), set independently for 5-hour and weekly. Different phrasings on Claude and Codex pages are normalized so the format stays consistent.
-
-### Color thresholds
-
-![Color thresholds](docs/images/05-color-thresholds.png)
-
-Each quota row is colored independently: normal rows use the service color, warning rows turn yellow, and critical rows turn red. If a quota is exhausted, the affected card also shows a `Limit` badge.
+- **Compact** hides reset text and minimizes the panel footprint.
+- **Detailed** shows full service names and reset information.
+- **Quota ball** shows the average remaining percentage in the center and one colored arc per visible quota.
+- **Edge hide** leaves a small colored arc visible when the quota ball is near an outer desktop edge.
+- Hiding Claude or Codex removes both of that service's quota rows and both arcs from the quota ball.
+- Warning rows turn yellow; critical and exhausted rows turn red.
 
 ## Buttons
 
-![Side rail controls](docs/images/06-sidebar-guide.png)
-
-| Side rail control | Action |
-|-------------------|--------|
-| × | Close |
+| Panel control | Action |
+|---------------|--------|
 | Pin | Toggle always on top |
-| R / U | Toggle Rem / Used for visible services |
-| 5h | Toggle 5-hour reset between countdown and clock time |
-| Wk | Toggle weekly reset between countdown and clock time |
-| ⚙ | Open settings |
+| Expand / collapse arrows | Switch compact and detailed modes |
+| Circular arrow | Refresh all visible services now |
 
-Per-service buttons:
-
-| Button | Action |
-|--------|--------|
-| ↻ | Refresh one service now |
-| ⚡ | Boost one service — refresh every minute for 30 minutes |
+Exit and the complete settings surface remain available from the tray icon; there is intentionally no close button on the widget.
 
 ## Settings
 
-Open with the ⚙ icon on the side rail.
+Open **Settings…** from the tray menu.
 
-- **General** — language, always on top, enable/disable each service
+- **General** — language, always on top, opacity, enable/disable each service, quota-ball and edge-hide behavior
+- **Appearance** — overall and text scale, quota-bar height, panel-button size, and quota-ball size
 - **Account** — login/logout controls and per-service login method (Browser OAuth / CLI / Auto)
-- **Layout** — arrangement, service order, per-service remaining/used, per-quota reset format
-- **Refresh** — normal interval (15 min default), Boost duration / interval (30 min / 1 min default)
+- **Layout** — compact/detailed mode, service order, and reset-time format
+- **Refresh** — normal interval (5 minutes by default)
 - **Thresholds** — yellow at 50%, red at 30% (configurable)
 
 ## How it works
@@ -136,6 +109,7 @@ For UI verification without spending quota, start Headroom with a fixture folder
 
 The folder must contain `claude.json` and `codex.json` in the same shape as the live API
 responses. Headroom watches those files and refreshes automatically when they change.
+Set `HEADROOM_SETTINGS_PATH` to an isolated JSON path during fixture runs so visual tests do not modify the normal user settings.
 
 ## Build and Test from Source
 

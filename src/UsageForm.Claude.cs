@@ -85,7 +85,7 @@ namespace Headroom
 
         async Task<bool> StartClaudePkceLoginAsync(ServiceState service)
         {
-            return await ClaudeBrowserLoginFlow.StartAsync(httpClient, ClaudeCredentialPath);
+            return await ClaudeBrowserLoginFlow.StartAsync(httpClient, ClaudeCredentialPath, English);
         }
 
     }

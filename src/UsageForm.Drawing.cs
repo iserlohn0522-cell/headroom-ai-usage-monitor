@@ -24,11 +24,16 @@ namespace Headroom
             hits.Clear();
             silentHits.Clear();
 
+            if (collapsedToBall)
+            {
+                DrawQuotaBall(g);
+                return;
+            }
+
             settings.CodexShowUsed = false;
             settings.ClaudeShowUsed = false;
             DrawCustomBatteryWidget(g);
-            if (sideRailOpacity > 0.01)
-                DrawSideRail(g);
+            DrawSideRail(g);
         }
 
         List<Tuple<ServiceState, string>> VisibleServices()
@@ -49,95 +54,191 @@ namespace Headroom
             return items;
         }
 
+        int UiScale(int value)
+        {
+            return WidgetLayoutMetrics.Scale(value, settings, runtimeDpi);
+        }
+
+        int UiScaleTextColumn(int value)
+        {
+            int scaled = UiScale(value);
+            int textScale = Math.Max(70, Math.Min(150, settings.TextScalePercent));
+            return Math.Max(1, (int)Math.Round(scaled * textScale / 100.0));
+        }
+
+        int UiScaleTextRow(int value)
+        {
+            int scaled = UiScale(value);
+            int textScale = Math.Max(100, Math.Min(150, settings.TextScalePercent));
+            return Math.Max(1, (int)Math.Ceiling(scaled * textScale / 100.0));
+        }
+
+        Size IdealWidgetSize()
+        {
+            return WidgetLayoutMetrics.IdealSize(settings, runtimeDpi);
+        }
+
+        Size SavedWidgetSizeForCurrentDpi()
+        {
+            return new Size(
+                WidgetLayoutMetrics.ScaleForDpi(Math.Max(1, settings.Width), runtimeDpi),
+                WidgetLayoutMetrics.ScaleForDpi(Math.Max(1, settings.Height), runtimeDpi));
+        }
+
+        static Point ClampLocationToWorkArea(Point location, Size size, Rectangle workArea)
+        {
+            int maxX = Math.Max(workArea.Left, workArea.Right - size.Width);
+            int maxY = Math.Max(workArea.Top, workArea.Bottom - size.Height);
+            return new Point(
+                Math.Max(workArea.Left, Math.Min(maxX, location.X)),
+                Math.Max(workArea.Top, Math.Min(maxY, location.Y)));
+        }
+
+        void ApplyCurrentDpiLayout()
+        {
+            if (collapsedToBall)
+            {
+                ResizeCollapsedBallForCurrentDpi();
+                return;
+            }
+
+            Size ideal = IdealWidgetSize();
+            Size saved = SavedWidgetSizeForCurrentDpi();
+            Size targetSize = new Size(
+                Math.Max(ideal.Width, saved.Width),
+                Math.Max(ideal.Height, saved.Height));
+            Rectangle workArea = Screen.FromRectangle(Bounds).WorkingArea;
+            Point target = ClampLocationToWorkArea(Location, targetSize, workArea);
+            MinimumSize = ideal;
+            Bounds = new Rectangle(target, targetSize);
+            expandedSize = targetSize;
+            expandedLocation = target;
+        }
+
         void ApplyLayoutMinimumSize()
         {
-            bool edge = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
-            MinimumSize = edge ? new Size(210, 168) : new Size(260, 108);
+            Size ideal = IdealWidgetSize();
+            MinimumSize = ideal;
             if (Width < MinimumSize.Width) Width = MinimumSize.Width;
             if (Height < MinimumSize.Height) Height = MinimumSize.Height;
         }
 
         void ApplyIdealSize()
         {
-            int idealW, idealH;
-            if (string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase))
-            {
-                idealW = 240;
-                idealH = 190;
-            }
-            else
-            {
-                idealW = 300;
-                idealH = 124;
-            }
-            Width  = Math.Max(MinimumSize.Width,  idealW);
-            Height = Math.Max(MinimumSize.Height, idealH);
-            settings.Width  = Width;
-            settings.Height = Height;
+            if (collapsedToBall) ExpandFromBall();
+            Rectangle oldBounds = Bounds;
+            Rectangle workArea = Screen.FromRectangle(oldBounds).WorkingArea;
+            int anchorThreshold = UiScale(16);
+            int leftDistance = Math.Abs(oldBounds.Left - workArea.Left);
+            int rightDistance = Math.Abs(oldBounds.Right - workArea.Right);
+            int topDistance = Math.Abs(oldBounds.Top - workArea.Top);
+            int bottomDistance = Math.Abs(oldBounds.Bottom - workArea.Bottom);
+            string horizontalAnchor = rightDistance <= anchorThreshold && rightDistance <= leftDistance
+                ? "right"
+                : (leftDistance <= anchorThreshold ? "left" : "");
+            string verticalAnchor = bottomDistance <= anchorThreshold && bottomDistance <= topDistance
+                ? "bottom"
+                : (topDistance <= anchorThreshold ? "top" : "");
+
+            Size ideal = IdealWidgetSize();
+            MinimumSize = ideal;
+            Point target = oldBounds.Location;
+            if (horizontalAnchor == "right") target.X = workArea.Right - ideal.Width;
+            else if (horizontalAnchor == "left") target.X = workArea.Left;
+            if (verticalAnchor == "bottom") target.Y = workArea.Bottom - ideal.Height;
+            else if (verticalAnchor == "top") target.Y = workArea.Top;
+            target = ClampLocationToWorkArea(target, ideal, workArea);
+            Bounds = new Rectangle(target, ideal);
+            settings.Width = WidgetLayoutMetrics.ToLogicalPixels(ideal.Width, runtimeDpi);
+            settings.Height = WidgetLayoutMetrics.ToLogicalPixels(ideal.Height, runtimeDpi);
+            expandedSize = ideal;
+            expandedLocation = target;
         }
 
         void DrawSideRail(Graphics g)
         {
-            int x         = ClientSize.Width - 24;
-            int closeY    = 4;
-            int pinY      = 30;
-            int fiveY     = 56;
-            int weekY     = 82;
-            int settingsY = 108;
+            bool detailed = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
+            int size = ActionButtonPixels();
+            int gap = UiScale(4);
+            int padding = UiScale(6);
+            int columns = detailed ? 1 : 2;
+            int rows = detailed ? 3 : 2;
+            int totalWidth = size * columns + gap * (columns - 1);
+            int totalHeight = size * rows + gap * (rows - 1);
+            int x = ClientSize.Width - padding - totalWidth;
+            int y = Math.Max(padding, (ClientSize.Height - totalHeight) / 2);
 
-            RegisterSideRailHits();
-
-            DrawIconButton(g, "close",     x, closeY,    Color.FromArgb(160, 160, 165), DrawCloseIcon);
-            DrawIconButton(g, "pin",       x, pinY,      settings.AlwaysOnTop ? Color.FromArgb(100, 180, 255) : Color.FromArgb(100, 100, 105), DrawPinIcon);
-            DrawIconButton(g, "fiveReset", x, fiveY,     Color.FromArgb(110, 125, 145), DrawFiveResetIcon);
-            DrawIconButton(g, "weekReset", x, weekY,     Color.FromArgb(110, 125, 145), DrawWeekResetIcon);
-            DrawIconButton(g, "settings",  x, settingsY, Color.FromArgb(130, 130, 135), DrawGearIcon);
+            DrawIconButton(g, "pin", new Rectangle(x, y, size, size),
+                settings.AlwaysOnTop ? Color.FromArgb(120, 195, 255) : Color.FromArgb(156, 164, 177),
+                DrawPinIcon);
+            if (detailed)
+            {
+                y += size + gap;
+                DrawIconButton(g, "widgetMode", new Rectangle(x, y, size, size),
+                    Color.FromArgb(169, 188, 224), DrawModeActionIcon);
+                y += size + gap;
+                DrawIconButton(g, "refreshAll", new Rectangle(x, y, size, size),
+                    Color.FromArgb(133, 215, 183), DrawRefreshActionIcon);
+            }
+            else
+            {
+                DrawIconButton(g, "widgetMode", new Rectangle(x + size + gap, y, size, size),
+                    Color.FromArgb(169, 188, 224), DrawModeActionIcon);
+                DrawIconButton(g, "refreshAll", new Rectangle(x + (totalWidth - size) / 2, y + size + gap, size, size),
+                    Color.FromArgb(133, 215, 183), DrawRefreshActionIcon);
+            }
         }
 
         void RegisterSideRailHits()
         {
-            int x         = ClientSize.Width - 24;
-            int closeY    = 4;
-            int pinY      = 30;
-            int fiveY     = 56;
-            int weekY     = 82;
-            int settingsY = 108;
-
-            hits["close"]     = new Rectangle(x - 6, closeY    - 6, 28, 28);
-            hits["pin"]       = new Rectangle(x - 6, pinY      - 6, 28, 28);
-            hits["fiveReset"] = new Rectangle(x - 6, fiveY     - 6, 28, 28);
-            hits["weekReset"] = new Rectangle(x - 6, weekY     - 6, 28, 28);
-            hits["settings"]  = new Rectangle(x - 6, settingsY - 6, 28, 28);
+            if (collapsedToBall) return;
+            bool detailed = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
+            int size = ActionButtonPixels();
+            int gap = UiScale(4);
+            int padding = UiScale(6);
+            int columns = detailed ? 1 : 2;
+            int rows = detailed ? 3 : 2;
+            int totalWidth = size * columns + gap * (columns - 1);
+            int totalHeight = size * rows + gap * (rows - 1);
+            int x = ClientSize.Width - padding - totalWidth;
+            int y = Math.Max(padding, (ClientSize.Height - totalHeight) / 2);
+            hits["pin"] = new Rectangle(x, y, size, size);
+            hits["widgetMode"] = detailed
+                ? new Rectangle(x, y + size + gap, size, size)
+                : new Rectangle(x + size + gap, y, size, size);
+            hits["refreshAll"] = detailed
+                ? new Rectangle(x, y + (size + gap) * 2, size, size)
+                : new Rectangle(x + (totalWidth - size) / 2, y + size + gap, size, size);
         }
 
-        void DrawIconButton(Graphics g, string key, int x, int y, Color color, IconPainter painter)
+        int ActionButtonPixels()
         {
-            var r = new Rectangle(x - 1, y - 1, 20, 20);
-            if (hoverKey == key)
+            return UiScale(Math.Max(24, Math.Min(40, settings.ActionButtonSize)));
+        }
+
+        void DrawIconButton(Graphics g, string key, Rectangle r, Color color, IconPainter painter)
+        {
+            hits[key] = r;
+            bool hover = hoverKey == key;
+            Color top = hover ? Color.FromArgb(66, 76, 91) : Color.FromArgb(39, 45, 54);
+            Color bottom = hover ? Color.FromArgb(48, 58, 72) : Color.FromArgb(29, 34, 42);
+            using (var path = RoundRect(r.X, r.Y, r.Width, r.Height, Math.Max(6, r.Width / 4)))
+            using (var bg = new System.Drawing.Drawing2D.LinearGradientBrush(r, top, bottom, 90f))
+            using (var border = new Pen(hover ? Color.FromArgb(100, 126, 160) : Color.FromArgb(58, 67, 80), 0.8f))
             {
-                Color rawHoverBg =
-                    key == "close" ? Color.FromArgb(190, 58, 58) :
-                    key == "settings" ? Color.FromArgb(45, 132, 235) :
-                    Color.FromArgb(50, 50, 54);
-                Color hoverBg = FadeSideRailColor(rawHoverBg);
-                using (var bg = new SolidBrush(hoverBg))
-                using (var path = RoundRect(r.X - 4, r.Y - 4, r.Width + 8, r.Height + 8, 12))
-                    g.FillPath(bg, path);
-                color = key == "close" || key == "settings" ? Color.White : Color.FromArgb(Math.Min(255, color.R + 40), Math.Min(255, color.G + 40), Math.Min(255, color.B + 40));
+                g.FillPath(bg, path);
+                g.DrawPath(border, path);
             }
-            painter(g, r, FadeSideRailColor(color));
-        }
 
-        Color FadeSideRailColor(Color color)
-        {
-            int alpha = Math.Max(0, Math.Min(255, (int)Math.Round(color.A * sideRailOpacity)));
-            return Color.FromArgb(alpha, color.R, color.G, color.B);
+            int inset = Math.Max(4, r.Width / 5);
+            var iconRect = Rectangle.Inflate(r, -inset, -inset);
+            painter(g, iconRect, hover ? Color.White : color);
         }
 
         void DrawCustomBatteryWidget(Graphics g)
         {
             bool edge = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
-            int radius = 8;
+            int radius = UiScale(8);
             using (var path = RoundRect(0, 0, Math.Max(1, ClientSize.Width - 1), Math.Max(1, ClientSize.Height - 1), radius))
             {
                 Color top = edge ? Color.FromArgb(28, 31, 37) : Color.FromArgb(24, 27, 32);
@@ -148,31 +249,28 @@ namespace Headroom
                     g.DrawPath(border, path);
             }
 
-            DrawModeToggle(g, edge ? "-" : "+");
-
             int rowCount = CountBatteryRows();
             if (rowCount == 0) rowCount = 1;
-            int pad = edge ? 10 : 7;
-            int toggleSpace = 28;
-            int rowGap = edge ? 7 : 3;
-            int totalGap = Math.Max(0, rowCount - 1) * rowGap;
-            int availableH = Math.Max(24, ClientSize.Height - pad * 2 - totalGap);
-            int rowH = Math.Max(edge ? 30 : 21, availableH / rowCount);
-            int rowW = Math.Max(160, ClientSize.Width - pad * 2 - toggleSpace);
-            int y = pad;
+            int pad = UiScale(edge ? 8 : 6);
+            int buttonGap = UiScale(4);
+            int actionSpace = (edge ? ActionButtonPixels() : ActionButtonPixels() * 2 + buttonGap) + UiScale(10);
+            int rowGap = UiScale(edge ? 4 : 2);
+            int rowH = UiScaleTextRow(edge ? 25 : 19);
+            int rowW = Math.Max(UiScale(120), ClientSize.Width - pad * 2 - actionSpace);
+            int contentHeight = rowCount * rowH + Math.Max(0, rowCount - 1) * rowGap;
+            int y = Math.Max(pad, (ClientSize.Height - contentHeight) / 2);
 
-            if (settings.ShowCodex)
+            foreach (var item in VisibleServices())
             {
-                DrawBatteryRow(g, "5h", codex, false, pad, y, rowW, rowH, BatteryColor(codex.Data.FiveHourRemainingPercent(), CodexFiveColor()), edge);
+                ServiceState service = item.Item1;
+                Color fiveColor = service.Name == "Codex" ? CodexFiveColor() : ClaudeFiveColor();
+                Color weekColor = service.Name == "Codex" ? CodexWeekColor() : ClaudeWeekColor();
+                DrawBatteryRow(g, "5h", service, false, pad, y, rowW, rowH,
+                    BatteryColor(service.Data.FiveHourRemainingPercent(), fiveColor), edge);
                 y += rowH + rowGap;
-                DrawBatteryRow(g, "7d", codex, true, pad, y, rowW, rowH, BatteryColor(codex.Data.WeeklyRemainingPercent(), CodexWeekColor()), edge);
+                DrawBatteryRow(g, "7d", service, true, pad, y, rowW, rowH,
+                    BatteryColor(service.Data.WeeklyRemainingPercent(), weekColor), edge);
                 y += rowH + rowGap;
-            }
-            if (settings.ShowClaude)
-            {
-                DrawBatteryRow(g, "5h", claude, false, pad, y, rowW, rowH, BatteryColor(claude.Data.FiveHourRemainingPercent(), ClaudeFiveColor()), edge);
-                y += rowH + rowGap;
-                DrawBatteryRow(g, "7d", claude, true, pad, y, rowW, rowH, BatteryColor(claude.Data.WeeklyRemainingPercent(), ClaudeWeekColor()), edge);
             }
         }
 
@@ -189,27 +287,92 @@ namespace Headroom
         Color ClaudeFiveColor() { return Color.FromArgb(215, 154, 101); }
         Color ClaudeWeekColor() { return Color.FromArgb(155, 90, 54); }
 
+        void DrawQuotaBall(Graphics g)
+        {
+            hits["ball"] = ClientRectangle;
+            int diameter = Math.Max(20, Math.Min(ClientSize.Width, ClientSize.Height) - 2);
+            int x = (ClientSize.Width - diameter) / 2;
+            int y = (ClientSize.Height - diameter) / 2;
+            var circle = new Rectangle(x, y, diameter, diameter);
+
+            using (var shadow = new SolidBrush(Color.FromArgb(90, 0, 0, 0)))
+                g.FillEllipse(shadow, x + 1, y + 2, diameter - 1, diameter - 1);
+            using (var fill = new System.Drawing.Drawing2D.LinearGradientBrush(
+                circle, Color.FromArgb(43, 49, 61), Color.FromArgb(19, 23, 30), 135f))
+                g.FillEllipse(fill, circle);
+
+            var quotas = new List<Tuple<int?, Color>>();
+            if (settings.ShowCodex)
+            {
+                quotas.Add(Tuple.Create(codex.Data.FiveHourRemainingPercent(), CodexFiveColor()));
+                quotas.Add(Tuple.Create(codex.Data.WeeklyRemainingPercent(), CodexWeekColor()));
+            }
+            if (settings.ShowClaude)
+            {
+                quotas.Add(Tuple.Create(claude.Data.FiveHourRemainingPercent(), ClaudeFiveColor()));
+                quotas.Add(Tuple.Create(claude.Data.WeeklyRemainingPercent(), ClaudeWeekColor()));
+            }
+            if (quotas.Count == 0)
+                quotas.Add(Tuple.Create<int?, Color>(null, Color.FromArgb(120, 130, 145)));
+
+            float ringWidth = Math.Max(3.2f, diameter * 0.105f);
+            float inset = ringWidth / 2f + 2f;
+            var ringRect = new RectangleF(
+                x + inset, y + inset,
+                diameter - inset * 2f, diameter - inset * 2f);
+            float sector = 360f / quotas.Count;
+            float gap = Math.Min(11f, sector * 0.14f);
+            float trackSpan = sector - gap;
+            int total = 0;
+            int known = 0;
+
+            for (int i = 0; i < quotas.Count; i++)
+            {
+                float start = -90f + i * sector + gap / 2f;
+                using (var track = new Pen(Color.FromArgb(78, 88, 101), ringWidth)
+                {
+                    StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                    EndCap = System.Drawing.Drawing2D.LineCap.Round
+                })
+                    g.DrawArc(track, ringRect, start, trackSpan);
+
+                int? remaining = quotas[i].Item1;
+                if (!remaining.HasValue) continue;
+                int clamped = Math.Max(0, Math.Min(100, remaining.Value));
+                total += clamped;
+                known++;
+                float amount = Math.Max(clamped == 0 ? 2.5f : 3f, trackSpan * clamped / 100f);
+                Color quotaColor = BatteryColor(clamped, quotas[i].Item2);
+                using (var quotaPen = new Pen(quotaColor, ringWidth)
+                {
+                    StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                    EndCap = System.Drawing.Drawing2D.LineCap.Round
+                })
+                    g.DrawArc(quotaPen, ringRect, start, Math.Min(trackSpan, amount));
+            }
+
+            string centerText = known > 0
+                ? Math.Round(total / (double)known).ToString(CultureInfo.InvariantCulture)
+                : "··";
+            float fontSize = Math.Max(7f, diameter * 0.22f);
+            using (var font = new Font("Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel))
+            {
+                TextRenderer.DrawText(
+                    g, centerText, font, circle,
+                    Color.FromArgb(236, 241, 248),
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            }
+            using (var highlight = new Pen(Color.FromArgb(52, 255, 255, 255), 1f))
+                g.DrawArc(highlight, x + 3, y + 3, diameter - 7, diameter - 7, 205f, 105f);
+        }
+
         Color BatteryColor(int? remaining, Color normal)
         {
             if (remaining.HasValue && remaining.Value <= settings.CriticalRemainingPercent)
                 return Color.FromArgb(224, 73, 73);
+            if (remaining.HasValue && remaining.Value <= settings.WarningRemainingPercent)
+                return Color.FromArgb(232, 169, 36);
             return normal;
-        }
-
-        void DrawModeToggle(Graphics g, string text)
-        {
-            int size = 22;
-            int x = ClientSize.Width - size - 6;
-            int y = 6;
-            hits["widgetMode"] = new Rectangle(x - 4, y - 4, size + 8, size + 8);
-            bool hover = hoverKey == "widgetMode";
-            using (var path = RoundRect(x, y, size, size, 6))
-            using (var bg = new SolidBrush(hover ? Color.FromArgb(50, 58, 70) : Color.FromArgb(32, 37, 45)))
-                g.FillPath(bg, path);
-            using (var f = new Font("Segoe UI", 13f, FontStyle.Bold))
-            using (var b = new SolidBrush(Color.FromArgb(220, 230, 240)))
-            using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                g.DrawString(text, f, b, new RectangleF(x, y - 1, size, size), sf);
         }
 
         void DrawBatteryRow(Graphics g, string label, ServiceState service, bool weekly, int x, int y, int w, int h, Color color, bool edge)
@@ -217,24 +380,34 @@ namespace Headroom
             int? remaining = weekly ? service.Data.WeeklyRemainingPercent() : service.Data.FiveHourRemainingPercent();
             double? displayed = weekly ? service.DisplayedWeekPct : service.DisplayedFivePct;
             string resetRaw = weekly ? service.Data.WeeklyReset : service.Data.FiveHourReset;
-            string reset = CompactResetText(resetRaw, weekly);
+            string reset = edge ? CompactResetText(resetRaw, weekly) : "";
             if (!service.Data.HasAnyValue())
-                reset = service.IsRefreshing ? "updating" : StatusShortText(service.Status ?? service.Data.Status);
+                reset = service.IsRefreshing ? T("更新中", "Updating") : StatusShortText(service.Status ?? service.Data.Status);
 
-            int labelW = edge ? 30 : 24;
-            int pctW = edge ? 42 : 36;
-            int gap = 5;
+            int labelW = UiScaleTextColumn(edge ? 70 : 44);
+            int pctW = UiScaleTextColumn(edge ? 40 : 34);
+            int gap = UiScale(4);
             int barX = x + labelW;
-            int barW = Math.Max(64, w - labelW - pctW - gap);
-            int barH = Math.Max(edge ? 17 : 14, h - (edge ? 8 : 5));
-            int barY = y + (h - barH) / 2;
+            int barW = Math.Max(UiScale(64), w - labelW - pctW - gap);
             string pct = remaining.HasValue ? remaining.Value.ToString(CultureInfo.InvariantCulture) + "%" : "--";
+            string serviceLabel = edge
+                ? service.Name + " " + label
+                : (service.Name == "Codex" ? "CX " : "CL ") + label;
+            float layoutScale = Math.Max(0.7f, Math.Min(1.5f, settings.OverallScalePercent / 100f));
+            float textScale = Math.Max(0.7f, Math.Min(1.5f, settings.TextScalePercent / 100f));
+            float dpiScale = Math.Max(0.5f, runtimeDpi / 96f);
+            float fontScale = layoutScale * textScale * dpiScale;
 
-            using (var labelFont = new Font("Segoe UI", edge ? 8.6f : 7.8f, FontStyle.Bold))
-            using (var pctFont = new Font("Segoe UI", edge ? 8.6f : 7.8f, FontStyle.Bold))
-            using (var resetFont = new Font("Segoe UI", edge ? 8.0f : 7.0f, FontStyle.Regular))
+            using (var labelFont = new Font(UiFontName, (edge ? 11.2f : 10f) * fontScale, FontStyle.Bold, GraphicsUnit.Pixel))
+            using (var pctFont = new Font("Segoe UI", (edge ? 11.5f : 10.4f) * fontScale, FontStyle.Bold, GraphicsUnit.Pixel))
+            using (var resetFont = new Font(UiFontName, (edge ? 10.1f : 9.1f) * fontScale, FontStyle.Regular, GraphicsUnit.Pixel))
             {
-                TextRenderer.DrawText(g, label, labelFont, new Rectangle(x, y, labelW, h), Color.FromArgb(196, 204, 214), TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding);
+                int desiredBarH = Math.Max(
+                    UiScale(Math.Max(8, Math.Min(24, settings.BarHeight))),
+                    resetFont.Height + UiScale(1));
+                int barH = Math.Max(UiScale(6), Math.Min(h - UiScale(3), desiredBarH));
+                int barY = y + (h - barH) / 2;
+                TextRenderer.DrawText(g, serviceLabel, labelFont, new Rectangle(x, y, labelW, h), Color.FromArgb(196, 204, 214), TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
                 DrawBatteryBar(g, barX, barY, barW, barH, displayed.HasValue ? displayed : remaining, color, reset, resetFont);
                 TextRenderer.DrawText(g, pct, pctFont, new Rectangle(barX + barW + gap, y, pctW, h), Color.FromArgb(232, 238, 245), TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.NoPadding);
             }
@@ -243,10 +416,12 @@ namespace Headroom
         string CompactResetText(string raw, bool weekly)
         {
             if (string.IsNullOrWhiteSpace(raw)) return "";
-            string mode = weekly ? "time" : "relative";
+            string mode = weekly ? settings.WeeklyResetMode : settings.FiveHourResetMode;
             string text = ResetText(raw, mode, English, weekly);
             return text.Replace("Reset in ", "")
                        .Replace("Reset ", "")
+                       .Replace("距重置 ", "")
+                       .Replace("重置 ", "")
                        .Replace("リセットまで ", "")
                        .Replace("リセット ", "")
                        .Trim();
@@ -256,19 +431,24 @@ namespace Headroom
         {
             switch (status)
             {
-                case "login_required": return "login";
-                case "login_pending": return "signing in";
-                case "rate_limited": return "wait";
-                case "fetch_error": return "error";
-                case "starting": return "starting";
-                case "updating": return "updating";
-                default: return string.IsNullOrWhiteSpace(status) ? "no data" : status;
+                case "login_required": return T("请登录", "Login");
+                case "login_pending": return T("登录中", "Signing in");
+                case "rate_limited": return T("请稍候", "Wait");
+                case "fetch_error": return T("错误", "Error");
+                case "no_data": return T("无数据", "No data");
+                case "no_usage_text": return T("无额度", "No quota");
+                case "fixture_missing": return T("缺少数据", "Missing data");
+                case "starting": return T("启动中", "Starting");
+                case "updating": return T("更新中", "Updating");
+                default: return string.IsNullOrWhiteSpace(status) ? T("无数据", "No data") : status;
             }
         }
 
         void DrawBatteryBar(Graphics g, int x, int y, int w, int h, double? pct, Color color, string reset, Font resetFont)
         {
-            using (var outline = RoundRect(x, y, w, h, 5))
+            int inset = UiScale(2);
+            int nubWidth = UiScale(3);
+            using (var outline = RoundRect(x, y, w, h, UiScale(5)))
             using (var bg = new SolidBrush(Color.FromArgb(16, 19, 23)))
             using (var pen = new Pen(Color.FromArgb(165, color), 1.4f))
             {
@@ -277,15 +457,18 @@ namespace Headroom
             }
 
             using (var nub = new SolidBrush(Color.FromArgb(165, color)))
-                g.FillRectangle(nub, x + w, y + Math.Max(2, h / 3), 3, Math.Max(4, h / 3));
+                g.FillRectangle(nub, x + w, y + Math.Max(UiScale(2), h / 3), nubWidth, Math.Max(UiScale(4), h / 3));
 
             if (pct.HasValue)
             {
                 double clamped = Math.Max(0, Math.Min(100, pct.Value));
-                int fillW = Math.Max(clamped <= 0 ? 0 : 4, (int)Math.Round((w - 4) * clamped / 100.0));
+                int fillArea = Math.Max(1, w - inset * 2);
+                int fillW = Math.Max(
+                    clamped <= 0 ? Math.Min(UiScale(3), fillArea) : UiScale(4),
+                    (int)Math.Round(fillArea * clamped / 100.0));
                 if (fillW > 0)
                 {
-                    using (var fillPath = RoundRect(x + 2, y + 2, fillW, h - 4, 3))
+                    using (var fillPath = RoundRect(x + inset, y + inset, fillW, Math.Max(1, h - inset * 2), UiScale(3)))
                     using (var fill = new SolidBrush(Color.FromArgb(220, color)))
                         g.FillPath(fill, fillPath);
                 }
@@ -336,13 +519,13 @@ namespace Headroom
                 g.DrawString(state.Name, title, white, x + 30, y + 10);
                 int badgeX = x + 100;
                 if (stale)
-                    badgeX += DrawBadge(g, T("古い", "Stale"), badgeX, y + 14, Color.FromArgb(110, 85, 20), Color.FromArgb(180, 150, 50)) + 6;
+                    badgeX += DrawBadge(g, T("过期", "Stale"), badgeX, y + 14, Color.FromArgb(110, 85, 20), Color.FromArgb(180, 150, 50)) + 6;
                 if (exhausted)
-                    badgeX += DrawBadge(g, T("上限", "Limit"), badgeX, y + 14, Color.FromArgb(100, 35, 35), Color.FromArgb(220, 100, 100)) + 6;
+                    badgeX += DrawBadge(g, T("已达上限", "Limit"), badgeX, y + 14, Color.FromArgb(100, 35, 35), Color.FromArgb(220, 100, 100)) + 6;
                 if (state.Status == "fetch_error")
-                    badgeX += DrawBadge(g, T("エラー", "Error"), badgeX, y + 14, Color.FromArgb(90, 62, 28), Color.FromArgb(235, 170, 70)) + 6;
+                    badgeX += DrawBadge(g, T("错误", "Error"), badgeX, y + 14, Color.FromArgb(90, 62, 28), Color.FromArgb(235, 170, 70)) + 6;
                 if (state.Status == "rate_limited")
-                    DrawBadge(g, T("待機", "Wait"), badgeX, y + 14, Color.FromArgb(80, 64, 28), Color.FromArgb(220, 185, 80));
+                    DrawBadge(g, T("等待", "Wait"), badgeX, y + 14, Color.FromArgb(80, 64, 28), Color.FromArgb(220, 185, 80));
                 DrawCardControls(g, state, x, y, w, keyPrefix);
 
                 if (!state.Data.HasAnyValue())
@@ -371,8 +554,8 @@ namespace Headroom
                 DateTime now = DateTime.Now;
                 bool fiveResetTracking = resetTrackingAllowed && RefreshPolicy.IsResetDueOrPast(state.Data.FiveHourReset, now);
                 bool weekResetTracking = resetTrackingAllowed && RefreshPolicy.IsResetDueOrPast(state.Data.WeeklyReset, now);
-                DrawRow(g, T("５時間", "5h"), state.Data.FiveHourDisplayPercent(showUsed), state.DisplayedFivePct, showUsed, false, state.Data.FiveHourReset, state.Data.FiveHourNotStarted, settings.FiveHourResetMode, x, firstY, w, fiveAccent, label, reset, num, white, muted, dim, keyPrefix + "-fiveMode", keyPrefix + "-fiveResetLabel", fiveLockedByWeekly, fiveResetTracking);
-                DrawRow(g, T("１週間", "1W"), state.Data.WeeklyDisplayPercent(showUsed), state.DisplayedWeekPct, showUsed, true, state.Data.WeeklyReset, state.Data.WeeklyNotStarted, settings.WeeklyResetMode, x, secondY, w, state.Accent, label, reset, num, white, muted, dim, keyPrefix + "-weekMode", keyPrefix + "-weekResetLabel", false, weekResetTracking);
+                DrawRow(g, T("5小时", "5h"), state.Data.FiveHourDisplayPercent(showUsed), state.DisplayedFivePct, showUsed, false, state.Data.FiveHourReset, state.Data.FiveHourNotStarted, settings.FiveHourResetMode, x, firstY, w, fiveAccent, label, reset, num, white, muted, dim, keyPrefix + "-fiveMode", keyPrefix + "-fiveResetLabel", fiveLockedByWeekly, fiveResetTracking);
+                DrawRow(g, T("1周", "1W"), state.Data.WeeklyDisplayPercent(showUsed), state.DisplayedWeekPct, showUsed, true, state.Data.WeeklyReset, state.Data.WeeklyNotStarted, settings.WeeklyResetMode, x, secondY, w, state.Accent, label, reset, num, white, muted, dim, keyPrefix + "-weekMode", keyPrefix + "-weekResetLabel", false, weekResetTracking);
             }
         }
 
@@ -404,15 +587,15 @@ namespace Headroom
             switch (status)
             {
                 case "updating": return T("更新中", "Updating");
-                case "rate_limited": return T("429待機中", "Rate limited");
-                case "fetch_error": return T("一時的にAPIに接続できません", "Temporarily unreachable");
-                case "no_data": return T("データなし", "No data");
-                case "login_required": return T("ログインしてください", "Please log in");
-                case "login_pending": return T("ログイン中…ブラウザで認証してください", "Signing in… complete it in your browser");
-                case "fixture_missing": return T("フィクスチャなし", "Fixture missing");
-                case "no_usage_text": return T("使用量テキストなし", "No usage text");
-                case "starting": return T("起動中", "Starting");
-                default: return status ?? T("データなし", "No data");
+                case "rate_limited": return T("触发限流，请稍候", "Rate limited");
+                case "fetch_error": return T("暂时无法连接 API", "Temporarily unreachable");
+                case "no_data": return T("无数据", "No data");
+                case "login_required": return T("请登录", "Please log in");
+                case "login_pending": return T("登录中…请在浏览器完成", "Signing in… complete it in your browser");
+                case "fixture_missing": return T("缺少测试数据", "Fixture missing");
+                case "no_usage_text": return T("无额度文本", "No usage text");
+                case "starting": return T("启动中", "Starting");
+                default: return status ?? T("无数据", "No data");
             }
         }
 
@@ -432,7 +615,7 @@ namespace Headroom
                 mode = settings.WeeklyResetMode;
             }
             string text = ResetText(raw, mode, english);
-            return english ? text.Replace("Reset in ", "in ") : text.Replace("リセットまで ", "あと ");
+            return english ? text.Replace("Reset in ", "in ") : text.Replace("距重置 ", "还有 ");
         }
 
         static bool TryGetResetRemaining(string raw, out TimeSpan remaining)
@@ -451,7 +634,7 @@ namespace Headroom
         {
             if (!state.BoostUntil.HasValue || state.BoostUntil.Value <= DateTime.Now) return "";
             int min = Math.Max(1, (int)Math.Ceiling((state.BoostUntil.Value - DateTime.Now).TotalMinutes));
-            return English ? min + "m left" : "残り" + min + "分";
+            return English ? min + "m left" : "剩余" + min + "分钟";
         }
 
         void DrawRow(Graphics g, string label, int? pct, double? barPct, bool showUsed, bool weekly, string resetText, bool notStarted, string resetMode, int x, int y, int w, Color accent, Font labelFont, Font resetFont, Font numFont, Brush white, Brush muted, Brush dim, string hitMode = null, string hitReset = null, bool disabled = false, bool resetTracking = false)
@@ -468,13 +651,13 @@ namespace Headroom
             using (var resetTrackingBrush = new SolidBrush(Color.FromArgb(245, 196, 70)))
             {
                 int labelX = x + 12;
-                int label5hW = (int)Math.Ceiling(g.MeasureString(T("５時間", "5h"), labelFont).Width);
-                int labelWkW = (int)Math.Ceiling(g.MeasureString(T("１週間", "1W"), labelFont).Width);
+                int label5hW = (int)Math.Ceiling(g.MeasureString(T("5小时", "5h"), labelFont).Width);
+                int labelWkW = (int)Math.Ceiling(g.MeasureString(T("1周", "1W"), labelFont).Width);
                 int maxLabelW = Math.Max(label5hW, labelWkW);
-                string modeText = showUsed ? T("使用", "Used") : T("残り", "Rem");
+                string modeText = showUsed ? T("已用", "Used") : T("剩余", "Rem");
                 int modeColW = Math.Max(
-                    (int)Math.Ceiling(g.MeasureString(T("使用", "Used"), labelFont).Width),
-                    (int)Math.Ceiling(g.MeasureString(T("残り", "Rem"), labelFont).Width));
+                    (int)Math.Ceiling(g.MeasureString(T("已用", "Used"), labelFont).Width),
+                    (int)Math.Ceiling(g.MeasureString(T("剩余", "Rem"), labelFont).Width));
                 int modeX = labelX + maxLabelW + 1;
                 int percentX = modeX + modeColW + 2;
                 int labelY = y + Math.Max(0, (int)Math.Round((numFont.Size - labelFont.Size) / 2.0));
@@ -501,7 +684,7 @@ namespace Headroom
                 int barW = Math.Max(70, w - (barX - x) - 14);
                 DrawBar(g, barX, barY, barW, 9, barPct, rowColor);
 
-                string reset = notStarted ? T("未開始", "Not started") : ResetText(resetText, resetMode, English, weekly);
+                string reset = notStarted ? T("尚未开始", "Not started") : ResetText(resetText, resetMode, English, weekly);
                 if (!string.IsNullOrEmpty(reset))
                 {
                     int resetY = y + Math.Max(18, (int)Math.Round(PercentFontSize * 1.0));
@@ -558,30 +741,33 @@ namespace Headroom
             if (string.IsNullOrWhiteSpace(raw)) return "";
             var lower = raw.ToLowerInvariant();
             string cleaned = ResetTimes.Clean(raw);
-            if (cleaned.Contains("リセットまで")) return english ? cleaned.Replace("リセットまで", "Reset in") : cleaned;
+            if (cleaned.Contains("リセットまで"))
+                return english
+                    ? cleaned.Replace("リセットまで", "Reset in")
+                    : cleaned.Replace("リセットまで", "距重置");
             var relative = RelativeResetText(cleaned, preferAbsolute, english, weekly);
             if (!string.IsNullOrEmpty(relative)) return relative;
 
             DateTime target;
             if (TryParseResetTarget(cleaned, weekly, out target))
             {
-                if (preferAbsolute) return (english ? "Reset " : "リセット ") + FormatResetTime(target, english);
-                return (english ? "Reset in " : "リセットまで ") + FormatDuration(target - DateTime.Now, english);
+                if (preferAbsolute) return (english ? "Reset " : "重置 ") + FormatResetTime(target, english);
+                return (english ? "Reset in " : "距重置 ") + FormatDuration(target - DateTime.Now, english);
             }
             if (!weekly && IsTimeOnly(cleaned)) return "";
 
             if (cleaned.Contains("後にリセット"))
             {
                 var s = cleaned.Replace("後にリセット", "").Replace("リセット", "").Trim();
-                return english ? "Reset in " + TranslateDurationText(s) : "リセットまで " + s;
+                return english ? "Reset in " + TranslateDurationText(s) : "距重置 " + TranslateDurationTextToChinese(s);
             }
             if (lower.Contains("reset"))
             {
                 var m = Regex.Match(cleaned, @"(\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2})");
-                if (m.Success) return (english ? "Reset " : "リセット ") + m.Groups[1].Value;
+                if (m.Success) return (english ? "Reset " : "重置 ") + m.Groups[1].Value;
                 return cleaned;
             }
-            return (english ? "Reset " : "リセット ") + cleaned;
+            return (english ? "Reset " : "重置 ") + cleaned;
         }
 
         static string RelativeResetText(string text, bool preferAbsolute, bool english)
@@ -596,8 +782,8 @@ namespace Headroom
             int hours = m.Groups[1].Success ? int.Parse(m.Groups[1].Value) : 0;
             int minutes = m.Groups[2].Success ? int.Parse(m.Groups[2].Value) : 0;
             var span = new TimeSpan(hours, minutes, 0);
-            if (preferAbsolute) return (english ? "Reset " : "リセット ") + FormatResetTime(DateTime.Now.Add(span), english);
-            return (english ? "Reset in " : "リセットまで ") + FormatDuration(span, english);
+            if (preferAbsolute) return (english ? "Reset " : "重置 ") + FormatResetTime(DateTime.Now.Add(span), english);
+            return (english ? "Reset in " : "距重置 ") + FormatDuration(span, english);
         }
 
         static bool IsTimeOnly(string text)
@@ -622,7 +808,7 @@ namespace Headroom
 
         static string FormatDuration(TimeSpan span, bool english)
         {
-            if (span.TotalSeconds <= 0) return english ? "0m" : "0分";
+            if (span.TotalSeconds <= 0) return english ? "0m" : "0分钟";
             int totalMinutes = Math.Max(0, (int)Math.Ceiling(span.TotalMinutes));
             int days = totalMinutes / (60 * 24);
             int hours = (totalMinutes % (60 * 24)) / 60;
@@ -633,9 +819,9 @@ namespace Headroom
                 if (hours > 0) return hours + "h " + minutes + "m";
                 return minutes + "m";
             }
-            if (days > 0) return days + "日 " + hours + "時間 " + minutes + "分";
-            if (hours > 0) return hours + "時間 " + minutes + "分";
-            return minutes + "分";
+            if (days > 0) return days + "天 " + hours + "小时 " + minutes + "分钟";
+            if (hours > 0) return hours + "小时 " + minutes + "分钟";
+            return minutes + "分钟";
         }
 
         static string TranslateDurationText(string text)
@@ -643,11 +829,16 @@ namespace Headroom
             return text.Replace("時間", "h ").Replace("分", "m").Trim();
         }
 
+        static string TranslateDurationTextToChinese(string text)
+        {
+            return text.Replace("時間", "小时").Replace("分", "分钟").Trim();
+        }
+
         static string FormatResetTime(DateTime value, bool english)
         {
             var today = DateTime.Now.Date;
             if (value.Date == today) return value.ToString("H:mm");
-            if (value.Date == today.AddDays(1)) return (english ? "Tomorrow " : "明日 ") + value.ToString("H:mm");
+            if (value.Date == today.AddDays(1)) return (english ? "Tomorrow " : "明天 ") + value.ToString("H:mm");
             return value.ToString("M/d H:mm");
         }
 
@@ -667,7 +858,7 @@ namespace Headroom
                     g.DrawPath(border, p);
             }
             using (var f = new Font("Segoe UI", 9.2f, FontStyle.Bold))
-                TextRenderer.DrawText(g, T("ログイン", "Login"), f,
+                TextRenderer.DrawText(g, T("登录", "Login"), f,
                     new Rectangle(x, y, buttonW, buttonH),
                     Color.FromArgb(235, 238, 242),
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
@@ -786,14 +977,91 @@ namespace Headroom
 
         void DrawPinIcon(Graphics g, Rectangle r, Color color)
         {
-            using (var pen = new Pen(color, 1.6f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
+            float cx = r.Left + r.Width / 2f;
+            float top = r.Top + r.Height * 0.12f;
+            float shoulder = r.Top + r.Height * 0.48f;
+            float bottom = r.Bottom - r.Height * 0.08f;
+            float half = r.Width * 0.28f;
+            using (var pen = new Pen(color, Math.Max(1.5f, r.Width * 0.09f))
             {
-                g.DrawLine(pen, r.X + 7, r.Y + 4, r.X + 14, r.Y + 4);
-                g.DrawLine(pen, r.X + 14, r.Y + 4, r.X + 14, r.Y + 10);
-                g.DrawLine(pen, r.X + 14, r.Y + 10, r.X + 7, r.Y + 10);
-                g.DrawLine(pen, r.X + 7, r.Y + 10, r.X + 7, r.Y + 4);
-                g.DrawLine(pen, r.X + 10, r.Y + 10, r.X + 10, r.Y + 16);
-                g.FillEllipse(new SolidBrush(color), r.X + 9, r.Y + 15, 3, 3);
+                StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                EndCap = System.Drawing.Drawing2D.LineCap.Round
+            })
+            {
+                g.DrawRectangle(pen, cx - half, top, half * 2f, shoulder - top);
+                g.DrawLine(pen, cx - half * 1.25f, shoulder, cx + half * 1.25f, shoulder);
+                g.DrawLine(pen, cx, shoulder, cx, bottom);
+            }
+        }
+
+        void DrawModeActionIcon(Graphics g, Rectangle r, Color color)
+        {
+            bool detailed = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
+            float stroke = Math.Max(1.4f, r.Width * 0.085f);
+            using (var pen = new Pen(color, stroke)
+            {
+                StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                EndCap = System.Drawing.Drawing2D.LineCap.Round
+            })
+            {
+                float left = r.Left + 1;
+                float top = r.Top + 1;
+                float right = r.Right - 1;
+                float bottom = r.Bottom - 1;
+                float cx = r.Left + r.Width / 2f;
+                float cy = r.Top + r.Height / 2f;
+                float head = Math.Max(2f, r.Width * 0.18f);
+                if (detailed)
+                {
+                    float innerA = cx - 1.5f;
+                    float innerB = cx + 1.5f;
+                    g.DrawLine(pen, left, top, innerA, cy - 1.5f);
+                    g.DrawLine(pen, innerA, cy - 1.5f, innerA - head, cy - 1.5f);
+                    g.DrawLine(pen, innerA, cy - 1.5f, innerA, cy - 1.5f - head);
+                    g.DrawLine(pen, right, bottom, innerB, cy + 1.5f);
+                    g.DrawLine(pen, innerB, cy + 1.5f, innerB + head, cy + 1.5f);
+                    g.DrawLine(pen, innerB, cy + 1.5f, innerB, cy + 1.5f + head);
+                }
+                else
+                {
+                    g.DrawLine(pen, cx - 1.5f, cy - 1.5f, left, top);
+                    g.DrawLine(pen, left, top, left + head, top);
+                    g.DrawLine(pen, left, top, left, top + head);
+                    g.DrawLine(pen, cx + 1.5f, cy + 1.5f, right, bottom);
+                    g.DrawLine(pen, right, bottom, right - head, bottom);
+                    g.DrawLine(pen, right, bottom, right, bottom - head);
+                }
+            }
+        }
+
+        void DrawRefreshActionIcon(Graphics g, Rectangle r, Color color)
+        {
+            bool active = claude.IsRefreshing || codex.IsRefreshing;
+            float stroke = Math.Max(1.6f, r.Width * 0.1f);
+            float inset = stroke;
+            float angle = active ? spinnerFrame * 90f : -35f;
+            var arcRect = new RectangleF(r.X + inset, r.Y + inset, r.Width - inset * 2f, r.Height - inset * 2f);
+            using (var pen = new Pen(active ? Color.FromArgb(112, 196, 255) : color, stroke)
+            {
+                StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                EndCap = System.Drawing.Drawing2D.LineCap.Round
+            })
+                g.DrawArc(pen, arcRect, angle, 270f);
+
+            double radians = (angle + 270f) * Math.PI / 180.0;
+            float radiusX = arcRect.Width / 2f;
+            float radiusY = arcRect.Height / 2f;
+            float tipX = arcRect.X + radiusX + (float)Math.Cos(radians) * radiusX;
+            float tipY = arcRect.Y + radiusY + (float)Math.Sin(radians) * radiusY;
+            float arrow = Math.Max(2.5f, r.Width * 0.18f);
+            using (var brush = new SolidBrush(active ? Color.FromArgb(112, 196, 255) : color))
+            {
+                g.FillPolygon(brush, new[]
+                {
+                    new PointF(tipX, tipY),
+                    new PointF(tipX - arrow, tipY - arrow * 0.2f),
+                    new PointF(tipX - arrow * 0.2f, tipY + arrow)
+                });
             }
         }
 
@@ -881,7 +1149,7 @@ namespace Headroom
         void DrawTokenToggleIcon(Graphics g, Rectangle r, Color color)
         {
             bool showUsed = settings.ClaudeShowUsed;
-            string text = showUsed ? T("使", "U") : T("残", "R");
+            string text = showUsed ? T("用", "U") : T("余", "R");
             using (var f = new Font("Segoe UI", 9f, FontStyle.Bold))
             using (var br = new SolidBrush(color))
             {
@@ -930,7 +1198,7 @@ namespace Headroom
             using (var f = new Font("Segoe UI", 6f, FontStyle.Bold))
             using (var br = new SolidBrush(color))
             {
-                string lbl = T("週", "Wk");
+                string lbl = T("周", "Wk");
                 SizeF sz = g.MeasureString(lbl, f);
                 g.DrawString(lbl, f, br, cx - sz.Width / 2f, r.Bottom - sz.Height);
             }
@@ -951,7 +1219,15 @@ namespace Headroom
         static System.Drawing.Drawing2D.GraphicsPath RoundRect(int x, int y, int w, int h, int r)
         {
             var path = new System.Drawing.Drawing2D.GraphicsPath();
-            int d = Math.Max(1, r * 2);
+            w = Math.Max(1, w);
+            h = Math.Max(1, h);
+            r = Math.Max(0, Math.Min(r, Math.Min(w, h) / 2));
+            if (r == 0)
+            {
+                path.AddRectangle(new Rectangle(x, y, w, h));
+                return path;
+            }
+            int d = r * 2;
             path.AddArc(x, y, d, d, 180, 90);
             path.AddArc(x + w - d, y, d, d, 270, 90);
             path.AddArc(x + w - d, y + h - d, d, d, 0, 90);

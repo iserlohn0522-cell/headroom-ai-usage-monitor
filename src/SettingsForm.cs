@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -13,6 +14,8 @@ namespace Headroom
         readonly WidgetSettings original;
         readonly Action preview;
         readonly ToolTip tooltips = new ToolTip();
+        readonly List<Tuple<Control, string, string>> localizedTooltips =
+            new List<Tuple<Control, string, string>>();
         readonly bool fixtureMode;
         bool _updatingLanguage;
         DarkScrollContainer scrollContainer;
@@ -26,6 +29,7 @@ namespace Headroom
 
         readonly DarkComboBox language = new DarkComboBox();
         readonly DarkComboBox layoutMode = new DarkComboBox();
+        readonly DarkComboBox panelMode = new DarkComboBox();
         readonly DarkComboBox serviceOrder = new DarkComboBox();
         readonly DarkComboBox codexMode = new DarkComboBox();
         readonly DarkComboBox claudeMode = new DarkComboBox();
@@ -35,7 +39,15 @@ namespace Headroom
         readonly DarkTextBox boostDuration = new DarkTextBox();
         readonly DarkTextBox boostInterval = new DarkTextBox();
         readonly DarkTextBox opacity = new DarkTextBox();
+        readonly DarkTextBox overallScale = new DarkTextBox();
+        readonly DarkTextBox textScale = new DarkTextBox();
+        readonly DarkTextBox barHeight = new DarkTextBox();
+        readonly DarkTextBox actionButtonSize = new DarkTextBox();
+        readonly DarkTextBox ballSize = new DarkTextBox();
+        readonly DarkTextBox collapseDelay = new DarkTextBox();
         readonly DarkComboBox topMost   = new DarkComboBox();
+        readonly DarkComboBox collapseToBall = new DarkComboBox();
+        readonly DarkComboBox edgeAutoHide = new DarkComboBox();
         readonly DarkComboBox showCodex  = new DarkComboBox();
         readonly DarkComboBox showClaude = new DarkComboBox();
         readonly DarkComboBox claudeLoginMethod = new DarkComboBox();
@@ -64,7 +76,7 @@ namespace Headroom
             this.logoutClaude   = logoutClaude;
             this.logoutCodex    = logoutCodex;
             this.fixtureMode = fixtureMode;
-            Text = T("設定", "Settings");
+            Text = T("设置", "Settings");
             Width = 880;
             Height = Math.Min(640, Screen.PrimaryScreen.WorkingArea.Height - 80);
             FormBorderStyle = FormBorderStyle.None;
@@ -73,16 +85,16 @@ namespace Headroom
             MinimizeBox = false;
             BackColor = Color.FromArgb(14, 14, 18);
             ForeColor = Color.WhiteSmoke;
-            Font = new Font("Yu Gothic UI", 9.5f);
+            Font = new Font(UiFontName, 9.5f);
 
             var title = new Label
             {
-                Text = T("設定", "Settings"),
-                Tag = "設定|Settings",
+                Text = T("设置", "Settings"),
+                Tag = "设置|Settings",
                 Location = new Point(28, 16),
                 Width = 300,
                 Height = 26,
-                Font = new Font("Yu Gothic UI", 13f, FontStyle.Bold),
+                Font = new Font(UiFontName, 13f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(235, 238, 244),
                 BackColor = Color.Transparent
             };
@@ -97,7 +109,7 @@ namespace Headroom
                     Width = 74,
                     Height = 18,
                     TextAlign = ContentAlignment.MiddleCenter,
-                    Font = new Font("Yu Gothic UI", 8f, FontStyle.Bold),
+                    Font = new Font(UiFontName, 8f, FontStyle.Bold),
                     ForeColor = Color.FromArgb(170, 210, 255),
                     BackColor = Color.FromArgb(28, 50, 76)
                 };
@@ -105,13 +117,13 @@ namespace Headroom
             }
 
             var cancel = new RoundButton {
-                Text = T("キャンセル", "Cancel"), Tag = "キャンセル|Cancel",
+                Text = T("取消", "Cancel"), Tag = "取消|Cancel",
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(Width - 218, 12), Width = 96, Height = 34,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 FillColor = Color.FromArgb(32, 32, 38),
                 ForeColor = Color.FromArgb(200, 206, 218),
-                Font = new Font("Yu Gothic UI", 10.5f),
+                Font = new Font(UiFontName, 10.5f),
                 CornerRadius = 0,
                 HoverBackColor   = Color.FromArgb(48, 48, 56),
                 PressedBackColor = Color.FromArgb(28, 28, 34),
@@ -124,19 +136,19 @@ namespace Headroom
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 FillColor = Color.FromArgb(45, 132, 235),
                 ForeColor = Color.White,
-                Font = new Font("Yu Gothic UI", 10.5f, FontStyle.Bold),
+                Font = new Font(UiFontName, 10.5f, FontStyle.Bold),
                 CornerRadius = 0,
                 HoverBackColor   = Color.FromArgb(72, 152, 250),
                 PressedBackColor = Color.FromArgb(35, 112, 210),
                 BorderColorNormal = Color.FromArgb(45, 132, 235)
             };
             var reset = new RoundButton {
-                Text = T("初期化", "Reset"), Tag = "初期化|Reset",
+                Text = T("恢复默认", "Reset"), Tag = "恢复默认|Reset",
                 Location = new Point(Width - 316, 12), Width = 90, Height = 34,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 FillColor = Color.FromArgb(32, 32, 38),
                 ForeColor = Color.FromArgb(200, 206, 218),
-                Font = new Font("Yu Gothic UI", 10.5f),
+                Font = new Font(UiFontName, 10.5f),
                 CornerRadius = 0,
                 HoverBackColor   = Color.FromArgb(44, 44, 52),
                 PressedBackColor = Color.FromArgb(28, 28, 34),
@@ -145,8 +157,8 @@ namespace Headroom
             reset.Click += (s, e) =>
             {
                 if (MessageBox.Show(
-                    T("設定をすべて初期値に戻しますか？", "Reset all settings to defaults?"),
-                    T("設定を初期化", "Reset settings"),
+                    T("要把全部设置恢复为默认值吗？", "Reset all settings to defaults?"),
+                    T("恢复默认设置", "Reset settings"),
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question) == DialogResult.Yes)
                 {
@@ -174,44 +186,56 @@ namespace Headroom
             body.Controls.Add(rightCard);
 
             int leftY = 12;
-            AddSection(leftCard, "一般", "General", ref leftY);
+            AddSection(leftCard, "常规", "General", ref leftY);
             AddRow(leftCard, "Language", "Language", "", "", language, ref leftY);
-            SetupCombo(topMost, settings.AlwaysOnTop ? "enabled" : "disabled", new[] { T("有効", "Enabled"), T("無効", "Disabled") });
-            AddRow(leftCard, "最前面に固定", "Always on top", "", "", topMost, ref leftY);
+            SetupCombo(topMost, settings.AlwaysOnTop ? "enabled" : "disabled", new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
+            AddRow(leftCard, "置顶显示", "Always on top", "", "", topMost, ref leftY);
             AddNumberRow(leftCard, "透明度 (%)", "Opacity (%)", "", "", opacity, settings.OpacityPercent, ref leftY, 35, 100);
-            SetupCombo(showCodex,  settings.ShowCodex  ? "enabled" : "disabled", new[] { T("有効", "Enabled"), T("無効", "Disabled") });
-            SetupCombo(showClaude, settings.ShowClaude ? "enabled" : "disabled", new[] { T("有効", "Enabled"), T("無効", "Disabled") });
-            AddRow(leftCard, "Codex 表示", "Codex display", "", "", showCodex,  ref leftY);
-            AddRow(leftCard, "Claude 表示", "Claude display", "", "", showClaude, ref leftY);
-            AddSection(leftCard, "アカウント", "Account", ref leftY);
-            AddRow(leftCard, "Claude ログイン方法", "Claude login method", "ブラウザOAuth / CLI", "Browser OAuth / CLI", claudeLoginMethod, ref leftY);
-            AddRow(leftCard, "Codex ログイン方法", "Codex login method", "ブラウザOAuth / CLI", "Browser OAuth / CLI", codexLoginMethod, ref leftY);
+            SetupCombo(showCodex,  settings.ShowCodex  ? "enabled" : "disabled", new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
+            SetupCombo(showClaude, settings.ShowClaude ? "enabled" : "disabled", new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
+            AddRow(leftCard, "显示 Codex", "Codex display", "", "", showCodex,  ref leftY);
+            AddRow(leftCard, "显示 Claude", "Claude display", "", "", showClaude, ref leftY);
+            SetupCombo(collapseToBall, settings.CollapseToBall ? "enabled" : "disabled", new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
+            SetupCombo(edgeAutoHide, settings.EdgeAutoHide ? "enabled" : "disabled", new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
+            AddRow(leftCard, "离开后缩成悬浮球", "Collapse to quota ball", "", "", collapseToBall, ref leftY);
+            AddRow(leftCard, "悬浮球贴外缘缩边", "Retract ball at outer edge",
+                "仅在启用悬浮球时生效", "Applies when quota-ball collapse is enabled", edgeAutoHide, ref leftY);
+            edgeAutoHide.Enabled = settings.CollapseToBall;
+            AddNumberRow(leftCard, "收起延时 (毫秒)", "Collapse delay (ms)", "", "", collapseDelay, settings.CollapseDelayMilliseconds, ref leftY, 300, 5000);
+            AddSection(leftCard, "账号", "Account", ref leftY);
+            AddRow(leftCard, "Claude 登录方式", "Claude login method", "浏览器 OAuth / CLI", "Browser OAuth / CLI", claudeLoginMethod, ref leftY);
+            AddRow(leftCard, "Codex 登录方式", "Codex login method", "浏览器 OAuth / CLI", "Browser OAuth / CLI", codexLoginMethod, ref leftY);
             AddAccountRow(leftCard, "Claude", claudeLoggedIn(), logoutClaude, ref leftY, true);
             AddAccountRow(leftCard, "Codex",  codexLoggedIn(),  logoutCodex,  ref leftY, false);
-            AddSection(leftCard, "レイアウト", "Layout", ref leftY);
-            AddRow(leftCard, "配置", "Arrangement", "", "", layoutMode, ref leftY);
-            AddRow(leftCard, "表示順", "Service order", "先頭のカード", "First card", serviceOrder, ref leftY);
-            AddRow(leftCard, "5時間リセット表示", "5h reset display", "", "", fiveResetMode, ref leftY);
-            AddRow(leftCard, "週リセット表示", "Weekly reset display", "", "", weeklyResetMode, ref leftY);
+            AddSection(leftCard, "布局", "Layout", ref leftY);
+            AddRow(leftCard, "面板模式", "Panel mode", "", "", panelMode, ref leftY);
+            AddRow(leftCard, "显示顺序", "Service order", "排在前面的额度", "First service", serviceOrder, ref leftY);
+            AddRow(leftCard, "5小时重置显示", "5h reset display", "", "", fiveResetMode, ref leftY);
+            AddRow(leftCard, "每周重置显示", "Weekly reset display", "", "", weeklyResetMode, ref leftY);
 
             int rightY = 12;
+            AddSection(rightCard, "外观尺寸", "Appearance", ref rightY);
+            AddNumberRow(rightCard, "整体缩放 (%)", "Overall scale (%)", "", "", overallScale, settings.OverallScalePercent, ref rightY, 70, 150);
+            AddNumberRow(rightCard, "文字缩放 (%)", "Text scale (%)", "", "", textScale, settings.TextScalePercent, ref rightY, 70, 150);
+            AddNumberRow(rightCard, "额度条高度 (px)", "Quota bar height (px)", "", "", barHeight, settings.BarHeight, ref rightY, 8, 24);
+            AddNumberRow(rightCard, "面板按钮尺寸 (px)", "Panel button size (px)", "", "", actionButtonSize, settings.ActionButtonSize, ref rightY, 24, 40);
+            AddNumberRow(rightCard, "悬浮球尺寸 (px)", "Quota ball size (px)", "", "", ballSize, settings.BallSize, ref rightY, 32, 64);
             AddSection(rightCard, "更新", "Refresh", ref rightY);
-            AddNumberRow(rightCard, "通常更新間隔 (分)", "Normal interval (min)", "", "", normal, settings.NormalIntervalMinutes, ref rightY, 1, 240);
-            AddNumberRow(rightCard, "ブースト時間 (分)", "Boost duration (min)", "", "", boostDuration, settings.BoostDurationMinutes, ref rightY, 1, 240);
-            AddNumberRow(rightCard, "ブースト更新間隔 (分)", "Boost interval (min)", "", "", boostInterval, settings.BoostIntervalMinutes, ref rightY, 1, 240);
-            AddSection(rightCard, "閾値", "Thresholds", ref rightY);
-            AddNumberWithColor(rightCard, "黄色になる残量 (%)", "Yellow threshold (%)", "", "", warningPercent, settings.WarningRemainingPercent, ref rightY, 1, 99);
-            AddNumberWithColor(rightCard, "赤になる残量 (%)", "Red threshold (%)", "", "", criticalPercent, settings.CriticalRemainingPercent, ref rightY, 1, 99);
+            AddNumberRow(rightCard, "正常更新间隔 (分钟)", "Normal interval (min)", "", "", normal, settings.NormalIntervalMinutes, ref rightY, 1, 240);
+            AddSection(rightCard, "阈值", "Thresholds", ref rightY);
+            AddNumberWithColor(rightCard, "黄色警告阈值 (%)", "Yellow threshold (%)", "", "", warningPercent, settings.WarningRemainingPercent, ref rightY, 1, 99);
+            AddNumberWithColor(rightCard, "红色警告阈值 (%)", "Red threshold (%)", "", "", criticalPercent, settings.CriticalRemainingPercent, ref rightY, 1, 99);
 
-            SetupCombo(layoutMode, settings.LayoutMode, new[] { T("横", "Wide"), T("縦", "Tall") });
+            SetupCombo(layoutMode, settings.LayoutMode, new[] { T("横向", "Wide"), T("纵向", "Tall") });
+            SetupCombo(panelMode, settings.WidgetMode, new[] { T("紧凑", "Compact"), T("详细", "Detailed") });
             SetupCombo(serviceOrder, settings.ServiceOrder, new[] { "Claude / Codex", "Codex / Claude" });
-            SetupCombo(codexMode, settings.CodexShowUsed ? "used" : "remaining", new[] { T("残量", "Remaining"), T("使用量", "Used") });
-            SetupCombo(claudeMode, settings.ClaudeShowUsed ? "used" : "remaining", new[] { T("残量", "Remaining"), T("使用量", "Used") });
-            SetupCombo(fiveResetMode, settings.FiveHourResetMode, new[] { T("リセット時刻", "Clock time"), T("残り時間", "Time left") });
-            SetupCombo(weeklyResetMode, settings.WeeklyResetMode, new[] { T("リセット時刻", "Clock time"), T("残り時間", "Time left") });
-            SetupCombo(claudeLoginMethod, settings.ClaudeLoginMethod, new[] { T("ブラウザOAuth", "Browser OAuth"), "CLI", T("自動", "Auto") });
-            SetupCombo(codexLoginMethod, settings.CodexLoginMethod, new[] { T("ブラウザOAuth", "Browser OAuth"), "CLI", T("自動", "Auto") });
-            SetupCombo(language, settings.Language, new[] { "日本語", "English" });
+            SetupCombo(codexMode, settings.CodexShowUsed ? "used" : "remaining", new[] { T("剩余", "Remaining"), T("已用", "Used") });
+            SetupCombo(claudeMode, settings.ClaudeShowUsed ? "used" : "remaining", new[] { T("剩余", "Remaining"), T("已用", "Used") });
+            SetupCombo(fiveResetMode, settings.FiveHourResetMode, new[] { T("重置时间", "Clock time"), T("剩余时间", "Time left") });
+            SetupCombo(weeklyResetMode, settings.WeeklyResetMode, new[] { T("重置时间", "Clock time"), T("剩余时间", "Time left") });
+            SetupCombo(claudeLoginMethod, settings.ClaudeLoginMethod, new[] { T("浏览器 OAuth", "Browser OAuth"), "CLI", T("自动", "Auto") });
+            SetupCombo(codexLoginMethod, settings.CodexLoginMethod, new[] { T("浏览器 OAuth", "Browser OAuth"), "CLI", T("自动", "Auto") });
+            SetupCombo(language, settings.Language, new[] { "简体中文", "English" });
             SetupNumbers();
 
             int contentH = Math.Max(leftY + 16, rightY + 16);
@@ -219,7 +243,7 @@ namespace Headroom
             rightCard.Height = contentH;
             vDivider.Height = contentH;
 
-            var locFont   = new Font("Yu Gothic UI", 9f);
+            var locFont   = new Font(UiFontName, 9f);
             var locNormal = Color.FromArgb(100, 106, 120);
             var locHover  = Color.FromArgb(170, 178, 200);
 
@@ -273,10 +297,7 @@ namespace Headroom
             FormClosed += (s, e) =>
             {
                 if (DialogResult != DialogResult.OK)
-                {
                     settings.CopyFrom(original);
-                    preview();
-                }
             };
         }
 
@@ -389,29 +410,32 @@ namespace Headroom
 
             Color signedInColor  = Color.FromArgb(140, 210, 160);
             Color signedOutColor = Color.FromArgb(160, 140, 120);
-            string statusText = T(serviceName + "：" + (loggedIn ? "ログイン中" : "未ログイン"),
-                                  serviceName + ": " + (loggedIn ? "Signed in" : "Not signed in"));
+            string statusZh = serviceName + "：" + (loggedIn ? "已登录" : "未登录");
+            string statusEn = serviceName + ": " + (loggedIn ? "Signed in" : "Not signed in");
             if (!loggedIn)
-                statusText += isClaude
-                    ? T("\n/login でサインイン", "\nType /login to sign in")
-                    : T("\nブラウザで自動サインイン", "\nBrowser sign-in starts");
+            {
+                statusZh += isClaude ? "\n输入 /login 登录" : "\n将打开浏览器登录";
+                statusEn += isClaude ? "\nType /login to sign in" : "\nBrowser sign-in starts";
+            }
             var statusLabel = new Label
             {
-                Text = statusText,
+                Text = T(statusZh, statusEn),
+                Tag = statusZh + "|" + statusEn,
                 Location = new Point(24, loggedIn ? y + 15 : y + 7),
                 Width = 260, Height = loggedIn ? 20 : 38,
-                Font = new Font("Yu Gothic UI", 9.2f),
+                Font = new Font(UiFontName, 9.2f),
                 ForeColor = loggedIn ? signedInColor : signedOutColor
             };
             parent.Controls.Add(statusLabel);
 
             var btn = new RoundButton
             {
-                Text = loggedIn ? T("ログアウト", "Logout") : T("ログイン", "Login"),
+                Text = loggedIn ? T("退出登录", "Logout") : T("登录", "Login"),
+                Tag = loggedIn ? "退出登录|Logout" : "登录|Login",
                 CornerRadius = 0, Width = 110, Height = 30,
                 FillColor        = loggedIn ? Color.FromArgb(44, 44, 52) : Color.FromArgb(45, 132, 235),
                 ForeColor        = loggedIn ? Color.FromArgb(200, 206, 218) : Color.White,
-                Font             = new Font("Yu Gothic UI", 9.5f),
+                Font             = new Font(UiFontName, 9.5f),
                 HoverBackColor   = loggedIn ? Color.FromArgb(56, 56, 66) : Color.FromArgb(62, 148, 250),
                 PressedBackColor = loggedIn ? Color.FromArgb(30, 30, 38) : Color.FromArgb(32, 110, 210)
             };
@@ -433,7 +457,8 @@ namespace Headroom
                 if (!awaitingConfirm)
                 {
                     awaitingConfirm = true;
-                    btn.Text = T("もう一度押して", "Confirm logout");
+                    btn.Tag = "再次点击确认|Confirm logout";
+                    btn.Text = T("再次点击确认", "Confirm logout");
                     btn.FillColor = Color.FromArgb(140, 45, 45);
                     btn.HoverBackColor = Color.FromArgb(165, 60, 60);
                     btn.Invalidate();
@@ -444,7 +469,8 @@ namespace Headroom
                         if (confirmTimer != null) confirmTimer.Stop();
                         if (!awaitingConfirm) return;
                         awaitingConfirm = false;
-                        btn.Text = T("ログアウト", "Logout");
+                        btn.Tag = "退出登录|Logout";
+                        btn.Text = T("退出登录", "Logout");
                         btn.FillColor      = Color.FromArgb(44, 44, 52);
                         btn.HoverBackColor = Color.FromArgb(56, 56, 66);
                         btn.Invalidate();
@@ -456,9 +482,11 @@ namespace Headroom
                     if (confirmTimer != null) confirmTimer.Stop();
                     awaitingConfirm = false;
                     loggedIn = false;
-                    statusLabel.Text = T(serviceName + "：未ログイン", serviceName + ": Not signed in");
+                    statusLabel.Tag = serviceName + "：未登录|" + serviceName + ": Not signed in";
+                    statusLabel.Text = T(serviceName + "：未登录", serviceName + ": Not signed in");
                     statusLabel.ForeColor = signedOutColor;
-                    btn.Text = T("ログイン", "Login");
+                    btn.Tag = "登录|Login";
+                    btn.Text = T("登录", "Login");
                     btn.FillColor        = Color.FromArgb(45, 132, 235);
                     btn.HoverBackColor   = Color.FromArgb(62, 148, 250);
                     btn.ForeColor        = Color.White;
@@ -482,7 +510,7 @@ namespace Headroom
                 Location = new Point(30, y),
                 Width = 260,
                 Height = 22,
-                Font = new Font("Yu Gothic UI", 11f, FontStyle.Bold),
+                Font = new Font(UiFontName, 11f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(185, 190, 212)
             };
             parent.Controls.Add(label);
@@ -493,11 +521,11 @@ namespace Headroom
         {
             int rowH = 50;
             bool hasDesc = !string.IsNullOrEmpty(descJa);
-            var titleLabel = new Label { Text = T(titleJa, titleEn), Tag = titleJa + "|" + titleEn, Location = new Point(24, hasDesc ? y + 9 : y + 15), Width = 210, Height = 20, Font = new Font("Yu Gothic UI", 9.2f), ForeColor = Color.FromArgb(210, 214, 226) };
+            var titleLabel = new Label { Text = T(titleJa, titleEn), Tag = titleJa + "|" + titleEn, Location = new Point(24, hasDesc ? y + 9 : y + 15), Width = 210, Height = 20, Font = new Font(UiFontName, 9.2f), ForeColor = Color.FromArgb(210, 214, 226) };
             parent.Controls.Add(titleLabel);
             if (hasDesc)
             {
-                var descLabel = new Label { Text = T(descJa, descEn), Tag = descJa + "|" + descEn, Location = new Point(24, y + 28), Width = 210, Height = 17, Font = new Font("Yu Gothic UI", 7.8f), ForeColor = Color.FromArgb(96, 104, 120) };
+                var descLabel = new Label { Text = T(descJa, descEn), Tag = descJa + "|" + descEn, Location = new Point(24, y + 28), Width = 210, Height = 17, Font = new Font(UiFontName, 7.8f), ForeColor = Color.FromArgb(96, 104, 120) };
                 parent.Controls.Add(descLabel);
             }
             control.Location = new Point(parent.Width - 200, y + 11);
@@ -531,16 +559,18 @@ namespace Headroom
 
         void SetupCombo(DarkComboBox box, string value, string[] items)
         {
-            box.Font = new Font("Yu Gothic UI", 9.5f);
+            box.Font = new Font(UiFontName, 9.5f);
             box.Width = 175;
             box.Items.Clear();
             box.Items.AddRange(items);
             if (box == layoutMode)                              box.SelectedIndex = string.Equals(value, "vertical",  StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            else if (box == panelMode)                          box.SelectedIndex = string.Equals(value, "edge", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             else if (box == serviceOrder)                       box.SelectedIndex = string.Equals(value, "codex-claude", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             else if (box == codexMode || box == claudeMode)    box.SelectedIndex = string.Equals(value, "used",      StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             else if (box == fiveResetMode || box == weeklyResetMode) box.SelectedIndex = string.Equals(value, "relative", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             else if (box == claudeLoginMethod || box == codexLoginMethod) box.SelectedIndex = LoginMethodIndex(value);
-            else if (box == topMost)                           box.SelectedIndex = string.Equals(value, "enabled",   StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+            else if (box == topMost || box == collapseToBall || box == edgeAutoHide)
+                                                                    box.SelectedIndex = string.Equals(value, "enabled", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
             else if (box == showCodex || box == showClaude)   box.SelectedIndex = string.Equals(value, "enabled",   StringComparison.OrdinalIgnoreCase) ? 0 : 1;
             else if (box == language)                          box.SelectedIndex = string.Equals(value, "en",        StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         }
@@ -558,6 +588,12 @@ namespace Headroom
             StyleNumber(boostDuration, settings.BoostDurationMinutes, 1, 240);
             StyleNumber(boostInterval, settings.BoostIntervalMinutes, 1, 240);
             StyleNumber(opacity, settings.OpacityPercent, 35, 100);
+            StyleNumber(overallScale, settings.OverallScalePercent, 70, 150);
+            StyleNumber(textScale, settings.TextScalePercent, 70, 150);
+            StyleNumber(barHeight, settings.BarHeight, 8, 24);
+            StyleNumber(actionButtonSize, settings.ActionButtonSize, 24, 40);
+            StyleNumber(ballSize, settings.BallSize, 32, 64);
+            StyleNumber(collapseDelay, settings.CollapseDelayMilliseconds, 300, 5000);
         }
 
         void StyleNumber(TextBox box, int value, int min, int max)
@@ -568,7 +604,7 @@ namespace Headroom
             box.TextAlign = HorizontalAlignment.Right;
             box.BackColor = Color.FromArgb(26, 28, 44);
             box.ForeColor = Color.FromArgb(210, 214, 226);
-            box.Font = new Font("Yu Gothic UI", 11f);
+            box.Font = new Font(UiFontName, 11f);
             box.BorderStyle = BorderStyle.FixedSingle;
         }
 
@@ -587,8 +623,8 @@ namespace Headroom
             var down = StepperButton("▼", 14);
             up.Click += (s, e) => StepNumber(box, 1, min, max);
             down.Click += (s, e) => StepNumber(box, -1, min, max);
-            tooltips.SetToolTip(up, T("値を増やす", "Increase value"));
-            tooltips.SetToolTip(down, T("値を減らす", "Decrease value"));
+            SetLocalizedToolTip(up, "增加数值", "Increase value");
+            SetLocalizedToolTip(down, "减少数值", "Decrease value");
             host.Controls.Add(up);
             host.Controls.Add(down);
             return host;
@@ -602,7 +638,7 @@ namespace Headroom
                 Location = new Point(145, top),
                 Width = 30,
                 Height = 14,
-                Font = new Font("Yu Gothic UI", 6.5f, FontStyle.Bold),
+                Font = new Font(UiFontName, 6.5f, FontStyle.Bold),
                 FillColor = Color.FromArgb(32, 36, 52),
                 HoverBackColor = Color.FromArgb(44, 52, 76),
                 PressedBackColor = Color.FromArgb(24, 28, 40),
@@ -633,20 +669,20 @@ namespace Headroom
         {
             box.BackColor = Color.FromArgb(26, 28, 44);
             box.ForeColor = Color.FromArgb(210, 214, 226);
-            box.Font = new Font("Yu Gothic UI", 9.5f);
+            box.Font = new Font(UiFontName, 9.5f);
             box.BorderStyle = BorderStyle.FixedSingle;
         }
 
         void UpdateLocationsLabel()
         {
             if (versionLocLabel == null) return;
-            versionLocLabel.Text  = T("バージョン: ", "Version: ") + AppInfo.DisplayVersion;
-            settingsLocLabel.Text = T("設定ファイル: ", "Settings: ") + WidgetSettings.SettingsPath;
-            authLocLabel.Text     = T("認証ファイル: ", "Auth: ") + UsageForm.ClaudeCredentialPath + " / " + UsageForm.CodexCredentialPath;
-            logsLocLabel.Text     = T("ログ: ", "Logs: ") + UsageForm.DebugDirectory;
-            tooltips.SetToolTip(settingsLocLabel, T("クリックで設定ファイルを選択表示", "Click to reveal the settings file"));
-            tooltips.SetToolTip(authLocLabel,     T("クリックで認証ファイルを選択表示", "Click to reveal the auth file"));
-            tooltips.SetToolTip(logsLocLabel,     T("クリックでログフォルダを開く",     "Click to open the logs folder"));
+            versionLocLabel.Text  = T("版本：", "Version: ") + AppInfo.DisplayVersion;
+            settingsLocLabel.Text = T("设置文件：", "Settings: ") + WidgetSettings.SettingsPath;
+            authLocLabel.Text     = T("认证文件：", "Auth: ") + UsageForm.ClaudeCredentialPath + " / " + UsageForm.CodexCredentialPath;
+            logsLocLabel.Text     = T("日志：", "Logs: ") + UsageForm.DebugDirectory;
+            tooltips.SetToolTip(settingsLocLabel, T("点击在资源管理器中定位设置文件", "Click to reveal the settings file"));
+            tooltips.SetToolTip(authLocLabel,     T("点击在资源管理器中定位认证文件", "Click to reveal the auth file"));
+            tooltips.SetToolTip(logsLocLabel,     T("点击打开日志文件夹", "Click to open the logs folder"));
         }
 
         void OpenLocation(string path, bool selectFile)
@@ -688,20 +724,34 @@ namespace Headroom
                     ReloadComboItems();
                     UpdateTaggedControls(this, en);
                     UpdateLocationsLabel();
+                    UpdateLocalizedTooltips();
                     preview();
                 }
                 finally { _updatingLanguage = false; }
             };
             normal.TextChanged += apply;
             opacity.TextChanged += apply;
+            overallScale.TextChanged += apply;
+            textScale.TextChanged += apply;
+            barHeight.TextChanged += apply;
+            actionButtonSize.TextChanged += apply;
+            ballSize.TextChanged += apply;
+            collapseDelay.TextChanged += apply;
             language.SelectedIndexChanged += applyLanguage;
             boostDuration.TextChanged += apply;
             boostInterval.TextChanged += apply;
             showCodex.SelectedIndexChanged  += apply;
             showClaude.SelectedIndexChanged += apply;
+            collapseToBall.SelectedIndexChanged += (s, e) =>
+            {
+                edgeAutoHide.Enabled = collapseToBall.SelectedIndex == 0;
+                apply(s, e);
+            };
+            edgeAutoHide.SelectedIndexChanged += apply;
             claudeLoginMethod.SelectedIndexChanged += apply;
             codexLoginMethod.SelectedIndexChanged += apply;
             layoutMode.SelectedIndexChanged += apply;
+            panelMode.SelectedIndexChanged += apply;
             serviceOrder.SelectedIndexChanged += apply;
             codexMode.SelectedIndexChanged += apply;
             claudeMode.SelectedIndexChanged += apply;
@@ -715,6 +765,7 @@ namespace Headroom
         void ReloadComboItems()
         {
             int layoutSel   = layoutMode.SelectedIndex;
+            int panelSel    = panelMode.SelectedIndex;
             int orderSel    = serviceOrder.SelectedIndex;
             int codexSel    = codexMode.SelectedIndex;
             int claudeSel   = claudeMode.SelectedIndex;
@@ -723,51 +774,65 @@ namespace Headroom
             int topMostSel  = topMost.SelectedIndex;
             int showCxSel   = showCodex.SelectedIndex;
             int showClSel   = showClaude.SelectedIndex;
+            int collapseSel = collapseToBall.SelectedIndex;
+            int edgeHideSel = edgeAutoHide.SelectedIndex;
             int claudeLoginSel = claudeLoginMethod.SelectedIndex;
             int codexLoginSel  = codexLoginMethod.SelectedIndex;
 
             layoutMode.Items.Clear();
-            layoutMode.Items.AddRange(new[] { T("横", "Wide"), T("縦", "Tall") });
+            layoutMode.Items.AddRange(new[] { T("横向", "Wide"), T("纵向", "Tall") });
             layoutMode.SelectedIndex = Math.Max(0, Math.Min(1, layoutSel));
+
+            panelMode.Items.Clear();
+            panelMode.Items.AddRange(new[] { T("紧凑", "Compact"), T("详细", "Detailed") });
+            panelMode.SelectedIndex = Math.Max(0, Math.Min(1, panelSel));
 
             serviceOrder.Items.Clear();
             serviceOrder.Items.AddRange(new[] { "Claude / Codex", "Codex / Claude" });
             serviceOrder.SelectedIndex = Math.Max(0, Math.Min(1, orderSel));
 
             codexMode.Items.Clear();
-            codexMode.Items.AddRange(new[] { T("残量", "Remaining"), T("使用量", "Used") });
+            codexMode.Items.AddRange(new[] { T("剩余", "Remaining"), T("已用", "Used") });
             codexMode.SelectedIndex = Math.Max(0, Math.Min(1, codexSel));
 
             claudeMode.Items.Clear();
-            claudeMode.Items.AddRange(new[] { T("残量", "Remaining"), T("使用量", "Used") });
+            claudeMode.Items.AddRange(new[] { T("剩余", "Remaining"), T("已用", "Used") });
             claudeMode.SelectedIndex = Math.Max(0, Math.Min(1, claudeSel));
 
             fiveResetMode.Items.Clear();
-            fiveResetMode.Items.AddRange(new[] { T("リセット時刻", "Clock time"), T("残り時間", "Time left") });
+            fiveResetMode.Items.AddRange(new[] { T("重置时间", "Clock time"), T("剩余时间", "Time left") });
             fiveResetMode.SelectedIndex = Math.Max(0, Math.Min(1, fiveSel));
 
             weeklyResetMode.Items.Clear();
-            weeklyResetMode.Items.AddRange(new[] { T("リセット時刻", "Clock time"), T("残り時間", "Time left") });
+            weeklyResetMode.Items.AddRange(new[] { T("重置时间", "Clock time"), T("剩余时间", "Time left") });
             weeklyResetMode.SelectedIndex = Math.Max(0, Math.Min(1, weeklySel));
 
             topMost.Items.Clear();
-            topMost.Items.AddRange(new[] { T("有効", "Enabled"), T("無効", "Disabled") });
+            topMost.Items.AddRange(new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
             topMost.SelectedIndex = Math.Max(0, Math.Min(1, topMostSel));
 
             showCodex.Items.Clear();
-            showCodex.Items.AddRange(new[] { T("有効", "Enabled"), T("無効", "Disabled") });
+            showCodex.Items.AddRange(new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
             showCodex.SelectedIndex = Math.Max(0, Math.Min(1, showCxSel));
 
             showClaude.Items.Clear();
-            showClaude.Items.AddRange(new[] { T("有効", "Enabled"), T("無効", "Disabled") });
+            showClaude.Items.AddRange(new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
             showClaude.SelectedIndex = Math.Max(0, Math.Min(1, showClSel));
 
+            collapseToBall.Items.Clear();
+            collapseToBall.Items.AddRange(new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
+            collapseToBall.SelectedIndex = Math.Max(0, Math.Min(1, collapseSel));
+
+            edgeAutoHide.Items.Clear();
+            edgeAutoHide.Items.AddRange(new[] { T("启用", "Enabled"), T("禁用", "Disabled") });
+            edgeAutoHide.SelectedIndex = Math.Max(0, Math.Min(1, edgeHideSel));
+
             claudeLoginMethod.Items.Clear();
-            claudeLoginMethod.Items.AddRange(new[] { T("ブラウザOAuth", "Browser OAuth"), "CLI", T("自動", "Auto") });
+            claudeLoginMethod.Items.AddRange(new[] { T("浏览器 OAuth", "Browser OAuth"), "CLI", T("自动", "Auto") });
             claudeLoginMethod.SelectedIndex = Math.Max(0, Math.Min(2, claudeLoginSel));
 
             codexLoginMethod.Items.Clear();
-            codexLoginMethod.Items.AddRange(new[] { T("ブラウザOAuth", "Browser OAuth"), "CLI", T("自動", "Auto") });
+            codexLoginMethod.Items.AddRange(new[] { T("浏览器 OAuth", "Browser OAuth"), "CLI", T("自动", "Auto") });
             codexLoginMethod.SelectedIndex = Math.Max(0, Math.Min(2, codexLoginSel));
         }
 
@@ -787,19 +852,40 @@ namespace Headroom
             }
         }
 
+        void SetLocalizedToolTip(Control control, string zh, string en)
+        {
+            localizedTooltips.Add(Tuple.Create(control, zh, en));
+            tooltips.SetToolTip(control, T(zh, en));
+        }
+
+        void UpdateLocalizedTooltips()
+        {
+            foreach (var item in localizedTooltips)
+                tooltips.SetToolTip(item.Item1, T(item.Item2, item.Item3));
+        }
+
         void ApplyToSettings()
         {
             settings.NormalIntervalMinutes = ReadBoxInt(normal, settings.NormalIntervalMinutes, 1, 240);
             settings.OpacityPercent = ReadBoxInt(opacity, settings.OpacityPercent, 35, 100);
-            settings.Language = language.SelectedIndex == 1 ? "en" : "ja";
+            settings.OverallScalePercent = ReadBoxInt(overallScale, settings.OverallScalePercent, 70, 150);
+            settings.TextScalePercent = ReadBoxInt(textScale, settings.TextScalePercent, 70, 150);
+            settings.BarHeight = ReadBoxInt(barHeight, settings.BarHeight, 8, 24);
+            settings.ActionButtonSize = ReadBoxInt(actionButtonSize, settings.ActionButtonSize, 24, 40);
+            settings.BallSize = ReadBoxInt(ballSize, settings.BallSize, 32, 64);
+            settings.CollapseDelayMilliseconds = ReadBoxInt(collapseDelay, settings.CollapseDelayMilliseconds, 300, 5000);
+            settings.Language = language.SelectedIndex == 1 ? "en" : "zh-CN";
             settings.BoostDurationMinutes = ReadBoxInt(boostDuration, settings.BoostDurationMinutes, 1, 240);
             settings.BoostIntervalMinutes = ReadBoxInt(boostInterval, settings.BoostIntervalMinutes, 1, 240);
             if (showCodex.SelectedIndex == 1 && showClaude.SelectedIndex == 1) showClaude.SelectedIndex = 0;
             settings.ShowCodex  = showCodex.SelectedIndex  == 0;
             settings.ShowClaude = showClaude.SelectedIndex == 0;
+            settings.CollapseToBall = collapseToBall.SelectedIndex == 0;
+            settings.EdgeAutoHide = edgeAutoHide.SelectedIndex == 0;
             settings.ClaudeLoginMethod = LoginMethodValue(claudeLoginMethod.SelectedIndex);
             settings.CodexLoginMethod = LoginMethodValue(codexLoginMethod.SelectedIndex);
             settings.LayoutMode = layoutMode.SelectedIndex == 1 ? "vertical" : "horizontal";
+            settings.WidgetMode = panelMode.SelectedIndex == 1 ? "edge" : "compact";
             settings.ServiceOrder = serviceOrder.SelectedIndex == 1 ? "codex-claude" : "claude-codex";
             settings.CodexShowUsed = false;
             settings.ClaudeShowUsed = false;
@@ -819,9 +905,14 @@ namespace Headroom
             return "browser";
         }
 
-        string T(string ja, string en)
+        string UiFontName
         {
-            return string.Equals(settings.Language, "en", StringComparison.OrdinalIgnoreCase) ? en : ja;
+            get { return string.Equals(settings.Language, "en", StringComparison.OrdinalIgnoreCase) ? "Segoe UI" : "Microsoft YaHei UI"; }
+        }
+
+        string T(string zh, string en)
+        {
+            return string.Equals(settings.Language, "en", StringComparison.OrdinalIgnoreCase) ? en : zh;
         }
     }
 }

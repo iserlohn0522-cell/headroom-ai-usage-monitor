@@ -102,14 +102,25 @@ namespace Headroom
 
     sealed class WidgetSettings
     {
-        public int Width = 300;
-        public int Height = 124;
+        public const int CurrentSettingsVersion = 2;
+
+        public int SettingsVersion = CurrentSettingsVersion;
+        public int Width = 232;
+        public int Height = 94;
         public string Language = DefaultLanguage();
         public int NormalIntervalMinutes = 5;
         public int BoostDurationMinutes = 30;
         public int BoostIntervalMinutes = 1;
         public bool AlwaysOnTop = true;
         public int OpacityPercent = 94;
+        public int OverallScalePercent = 100;
+        public int TextScalePercent = 100;
+        public int BarHeight = 12;
+        public int ActionButtonSize = 30;
+        public int BallSize = 42;
+        public bool CollapseToBall = true;
+        public bool EdgeAutoHide = true;
+        public int CollapseDelayMilliseconds = 1200;
         public bool ShowCodex = true;
         public bool ShowClaude = true;
         public string LayoutMode = "horizontal";
@@ -130,6 +141,10 @@ namespace Headroom
         {
             get
             {
+                string overridePath = Environment.GetEnvironmentVariable("HEADROOM_SETTINGS_PATH");
+                if (!string.IsNullOrWhiteSpace(overridePath))
+                    return Path.GetFullPath(overridePath.Trim());
+
                 return Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "Headroom",
@@ -149,7 +164,7 @@ namespace Headroom
 
         static string DefaultLanguage()
         {
-            return "en";
+            return "zh-CN";
         }
 
         public static WidgetSettings Load()
@@ -166,6 +181,7 @@ namespace Headroom
 
         public void CopyFrom(WidgetSettings other)
         {
+            SettingsVersion = other.SettingsVersion;
             Width = other.Width;
             Height = other.Height;
             Language = other.Language;
@@ -174,6 +190,14 @@ namespace Headroom
             BoostIntervalMinutes = other.BoostIntervalMinutes;
             AlwaysOnTop = other.AlwaysOnTop;
             OpacityPercent = other.OpacityPercent;
+            OverallScalePercent = other.OverallScalePercent;
+            TextScalePercent = other.TextScalePercent;
+            BarHeight = other.BarHeight;
+            ActionButtonSize = other.ActionButtonSize;
+            BallSize = other.BallSize;
+            CollapseToBall = other.CollapseToBall;
+            EdgeAutoHide = other.EdgeAutoHide;
+            CollapseDelayMilliseconds = other.CollapseDelayMilliseconds;
             ShowCodex = other.ShowCodex;
             ShowClaude = other.ShowClaude;
             LayoutMode = other.LayoutMode;
@@ -199,6 +223,80 @@ namespace Headroom
         public void Save()
         {
             SettingsStore.Save(SettingsPath, this);
+        }
+    }
+
+    static class WidgetLayoutMetrics
+    {
+        public static Size IdealSize(WidgetSettings settings)
+        {
+            return IdealSize(settings, 96);
+        }
+
+        public static Size IdealSize(WidgetSettings settings, int dpi)
+        {
+            bool detailed = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
+            int serviceCount = (settings.ShowCodex ? 1 : 0) + (settings.ShowClaude ? 1 : 0);
+            if (serviceCount == 0) serviceCount = 1;
+
+            int scale = Math.Max(70, Math.Min(150, settings.OverallScalePercent));
+            int textScale = Math.Max(70, Math.Min(150, settings.TextScalePercent));
+            int rows = serviceCount * 2;
+            int padding = Scale(detailed ? 8 : 6, scale, dpi);
+            int rowGap = Scale(detailed ? 4 : 2, scale, dpi);
+            int barHeight = Scale(Math.Max(8, Math.Min(24, settings.BarHeight)), scale, dpi);
+            int textAwareRowHeight = detailed ? 25 : 19;
+            if (textScale > 100)
+                textAwareRowHeight = (int)Math.Ceiling(textAwareRowHeight * textScale / 100.0);
+            int rowHeight = Math.Max(
+                Scale(textAwareRowHeight, scale, dpi),
+                barHeight + Scale(detailed ? 8 : 5, scale, dpi));
+            int contentHeight = padding * 2 + rows * rowHeight + Math.Max(0, rows - 1) * rowGap;
+
+            int buttonSize = Scale(Math.Max(24, Math.Min(40, settings.ActionButtonSize)), scale, dpi);
+            int buttonGap = Scale(4, scale, dpi);
+            int actionHeight = detailed
+                ? padding * 2 + buttonSize * 3 + buttonGap * 2
+                : padding * 2 + buttonSize * 2 + buttonGap;
+
+            int width = Scale(detailed ? 304 : 232, scale, dpi);
+            if (textScale > 100)
+            {
+                int textColumns = detailed ? 110 : 78;
+                width += Scale(textColumns * (textScale - 100) / 100, scale, dpi);
+            }
+            int height = Math.Max(contentHeight, actionHeight);
+            return new Size(width, height);
+        }
+
+        public static int Scale(int value, WidgetSettings settings)
+        {
+            return Scale(value, settings, 96);
+        }
+
+        public static int Scale(int value, WidgetSettings settings, int dpi)
+        {
+            return Scale(
+                value,
+                Math.Max(70, Math.Min(150, settings.OverallScalePercent)),
+                dpi);
+        }
+
+        public static int ScaleForDpi(int value, int dpi)
+        {
+            return Scale(value, 100, dpi);
+        }
+
+        public static int ToLogicalPixels(int value, int dpi)
+        {
+            int safeDpi = Math.Max(48, dpi);
+            return Math.Max(1, (int)Math.Round(value * 96.0 / safeDpi));
+        }
+
+        static int Scale(int value, int percent, int dpi)
+        {
+            int safeDpi = Math.Max(48, dpi);
+            return Math.Max(1, (int)Math.Round(value * percent / 100.0 * safeDpi / 96.0));
         }
     }
 }

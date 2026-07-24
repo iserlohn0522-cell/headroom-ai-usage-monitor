@@ -60,11 +60,18 @@ if ($Version) { $InformationalVersion = $Version.Trim() }
 
 $FileVersion = "0.0.0.0"
 if ($InformationalVersion -match '^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.(\d+))?') {
+  $major = $Matches[1]
+  $minor = $(if ($Matches[2]) { $Matches[2] } else { "0" })
+  $patch = $(if ($Matches[3]) { $Matches[3] } else { "0" })
+  $revision = $(if ($Matches[4]) { $Matches[4] } else { "0" })
+  if ($InformationalVersion -match '(?:-|\.)(?:custom)(?:-|\.)(\d+)$') {
+    $revision = $Matches[1]
+  }
   $FileVersion = @(
-    $Matches[1],
-    $(if ($Matches[2]) { $Matches[2] } else { "0" }),
-    $(if ($Matches[3]) { $Matches[3] } else { "0" }),
-    $(if ($Matches[4]) { $Matches[4] } else { "0" })
+    $major,
+    $minor,
+    $patch,
+    $revision
   ) -join "."
 }
 

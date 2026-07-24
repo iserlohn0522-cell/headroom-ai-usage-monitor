@@ -41,6 +41,7 @@ namespace Headroom
 
         const int WmNcLButtonDown = 0xA1;
         const int HtCaption = 0x2;
+        const int WmDpiChanged = 0x02E0;
         const float LabelFontSize   = 10.8f;
         const float PercentFontSize = 16.5f;
         const float ResetFontSize   =  9.9f;
@@ -58,6 +59,9 @@ namespace Headroom
         readonly Timer tooltipTimer = new Timer();
         readonly NotifyIcon trayIcon = new NotifyIcon();
         readonly ContextMenuStrip trayMenu = new ContextMenuStrip();
+        Icon appIcon;
+        Icon smallWindowIcon;
+        Icon largeWindowIcon;
         string pendingTooltipText = "";
         Point pendingTooltipLocation;
 
@@ -82,10 +86,26 @@ namespace Headroom
         double sideRailOpacity;
         int spinnerFrame;
         int paintSubtick;
+        bool collapsedToBall;
+        bool autoCollapseSuspended;
+        bool settingsPreviewActive;
+        bool dpiChangeActive;
+        int runtimeDpi = 96;
+        Size expandedSize;
+        Point expandedLocation;
+        string collapsedDockEdge = "";
+        string collapsedScreenDeviceName = "";
+        Rectangle collapsedWorkArea = Rectangle.Empty;
+        DateTime collapseDueAt = DateTime.MaxValue;
 
         bool English
         {
             get { return string.Equals(settings.Language, "en", StringComparison.OrdinalIgnoreCase); }
+        }
+
+        string UiFontName
+        {
+            get { return English ? "Segoe UI" : "Microsoft YaHei UI"; }
         }
 
         static readonly Dictionary<string, bool> cliAvailabilityCache = new Dictionary<string, bool>();
@@ -94,9 +114,12 @@ namespace Headroom
         public UsageForm()
         {
             Text = "Headroom";
+            AutoScaleMode = AutoScaleMode.None;
             Width = settings.Width;
             Height = settings.Height;
             ApplyLayoutMinimumSize();
+            expandedSize = Size;
+            expandedLocation = Location;
             FormBorderStyle = FormBorderStyle.None;
             TopMost = settings.AlwaysOnTop;
             KeyPreview = true;
@@ -127,12 +150,26 @@ namespace Headroom
                     silentDragging = false;
                 }
             };
-            MouseLeave += (s, e) => { hoverKey = ""; sideRailVisible = false; Invalidate(); };
+            MouseEnter += (s, e) =>
+            {
+                CancelAutoCollapse();
+                if (collapsedToBall) ExpandFromBall();
+            };
+            MouseLeave += (s, e) =>
+            {
+                hoverKey = "";
+                sideRailVisible = false;
+                ScheduleAutoCollapse();
+                Invalidate();
+            };
             Resize += (s, e) =>
             {
-                settings.Width = Width;
-                settings.Height = Height;
-                settings.Save();
+                if (!collapsedToBall && !dpiChangeActive)
+                {
+                    settings.Width = WidgetLayoutMetrics.ToLogicalPixels(Width, runtimeDpi);
+                    settings.Height = WidgetLayoutMetrics.ToLogicalPixels(Height, runtimeDpi);
+                    if (!settingsPreviewActive) settings.Save();
+                }
                 Invalidate();
             };
             KeyDown += async (s, e) =>
@@ -144,6 +181,8 @@ namespace Headroom
             paintTimer.Interval = 40;
             paintTimer.Tick += (s, e) =>
             {
+                if (!Visible) return;
+                UpdateAutoCollapseState();
                 UpdateSideRailVisibilityFromCursor();
                 UpdateSideRailOpacity();
                 paintSubtick = (paintSubtick + 1) % 6;
@@ -168,15 +207,23 @@ namespace Headroom
 
             Shown += async (s, e) =>
             {
+                SetupTrayIcon();
                 await RefreshAllAsync(true);
+                ScheduleAutoCollapse();
             };
 
             FormClosed += (s, e) =>
             {
                 try { if (claudeCredWatcher != null) claudeCredWatcher.Dispose(); } catch { }
                 try { if (codexCredWatcher  != null) codexCredWatcher.Dispose();  } catch { }
+                try { if (fixtureWatcher != null) fixtureWatcher.Dispose(); } catch { }
+                try { paintTimer.Stop(); paintTimer.Dispose(); } catch { }
+                try { schedulerTimer.Stop(); schedulerTimer.Dispose(); } catch { }
+                try { tooltipTimer.Stop(); tooltipTimer.Dispose(); } catch { }
+                try { toolTip.Dispose(); } catch { }
                 try { trayIcon.Visible = false; trayIcon.Dispose(); } catch { }
                 try { trayMenu.Dispose(); } catch { }
+                DisposeWindowIcons();
             };
         }
 
@@ -187,13 +234,48 @@ namespace Headroom
 
         protected override void WndProc(ref Message m)
         {
+            if (m.Msg == WmDpiChanged)
+            {
+                int newDpi = m.WParam.ToInt32() & 0xffff;
+                dpiChangeActive = true;
+                runtimeDpi = Math.Max(48, newDpi);
+                try
+                {
+                    base.WndProc(ref m);
+                    ApplyCurrentDpiLayout();
+                }
+                finally { dpiChangeActive = false; }
+                return;
+            }
+            if (m.Msg == Program.ShowExistingMessage)
+            {
+                ShowFromSecondInstance();
+                m.Result = IntPtr.Zero;
+                return;
+            }
             if (m.Msg == 0x14) { m.Result = IntPtr.Zero; return; } // WM_ERASEBKGND: suppress
             base.WndProc(ref m);
         }
 
+        internal void ShowFromSecondInstance()
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            if (InvokeRequired)
+            {
+                try { BeginInvoke(new Action(ShowFromSecondInstance)); } catch { }
+                return;
+            }
+
+            Visible = true;
+            if (collapsedToBall) ExpandFromBall();
+            Activate();
+            BringToFront();
+            SetupTrayIcon();
+        }
+
         void RenderLayered()
         {
-            if (!IsHandleCreated || Width <= 0 || Height <= 0) return;
+            if (!Visible || !IsHandleCreated || Width <= 0 || Height <= 0) return;
             IntPtr screenDC = GetDC(IntPtr.Zero);
             IntPtr memDC    = CreateCompatibleDC(screenDC);
             IntPtr hBmp = IntPtr.Zero, oldBmp = IntPtr.Zero;
@@ -429,18 +511,18 @@ namespace Headroom
                     service.Status = "login_required";
                     Invalidate();
                     MessageBox.Show(
-                        T("CLI が見つかりません。設定でログイン方法をブラウザOAuthに変更してください。",
+                        T("未找到 CLI。请在设置中把登录方式改为浏览器 OAuth。",
                           "CLI was not found. Change the login method to Browser OAuth in Settings."),
                         "Headroom", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                string title  = T("Headroom: 認証後このウィンドウを閉じてOK",
+                string title  = T("Headroom：完成登录后可关闭此窗口",
                                   "Headroom: close this window after sign-in");
                 string banner = service.Name == "Claude"
-                    ? T("[Headroom] /login と入力して認証してください。完了したらこのウィンドウは閉じてOKです。",
+                    ? T("[Headroom] 请在下方输入 /login 完成登录，完成后可关闭此窗口。",
                         "[Headroom] Type /login below to sign in. You can close this window once login completes.")
-                    : T("[Headroom] ブラウザで認証してください。完了したらこのウィンドウは閉じてOKです。",
+                    : T("[Headroom] 浏览器将打开登录页面，完成后可关闭此窗口。",
                         "[Headroom] A browser will open for sign-in. You can close this window once login completes.");
                 try
                 {
@@ -450,7 +532,7 @@ namespace Headroom
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(T("CLI を起動できませんでした: ", "Failed to launch CLI: ") + ex.Message,
+                    MessageBox.Show(T("无法启动 CLI：", "Failed to launch CLI: ") + ex.Message,
                         "Headroom", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 return;
@@ -630,9 +712,9 @@ namespace Headroom
             catch { }
         }
 
-        string T(string ja, string en)
+        string T(string zh, string en)
         {
-            return English ? en : ja;
+            return English ? en : zh;
         }
 
         internal static void WriteDebug(string name, string text)
@@ -648,48 +730,156 @@ namespace Headroom
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
+            try { runtimeDpi = Math.Max(48, DeviceDpi); } catch { runtimeDpi = 96; }
+            dpiChangeActive = true;
+            try { ApplyCurrentDpiLayout(); }
+            finally { dpiChangeActive = false; }
             try
             {
-                Icon rawIco = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-                Icon = rawIco;
-                trayIcon.Icon = rawIco;
-                Icon icoSmall = new Icon(rawIco, 16, 16);
-                Icon icoBig   = new Icon(rawIco, 48, 48);
-                SendMessageIcon(Handle, 0x80, new IntPtr(0), icoSmall.Handle);
-                SendMessageIcon(Handle, 0x80, new IntPtr(1), icoBig.Handle);
+                DisposeWindowIcons();
+                appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                smallWindowIcon = new Icon(appIcon, 16, 16);
+                largeWindowIcon = new Icon(appIcon, 48, 48);
+                Icon = appIcon;
+                trayIcon.Icon = appIcon;
+                SendMessageIcon(Handle, 0x80, new IntPtr(0), smallWindowIcon.Handle);
+                SendMessageIcon(Handle, 0x80, new IntPtr(1), largeWindowIcon.Handle);
             }
             catch { }
             RenderLayered();
         }
 
+        void DisposeWindowIcons()
+        {
+            try { if (smallWindowIcon != null) smallWindowIcon.Dispose(); } catch { }
+            try { if (largeWindowIcon != null) largeWindowIcon.Dispose(); } catch { }
+            try { if (appIcon != null) appIcon.Dispose(); } catch { }
+            smallWindowIcon = null;
+            largeWindowIcon = null;
+            appIcon = null;
+        }
+
         void SetupTrayIcon()
         {
             trayMenu.Items.Clear();
-            trayMenu.Items.Add(Visible ? "Hide widget" : "Show widget", null, (s, e) =>
+
+            trayMenu.Items.Add(T(Visible ? "隐藏面板" : "显示面板", Visible ? "Hide widget" : "Show widget"), null, (s, e) =>
             {
                 Visible = !Visible;
-                if (Visible) Activate();
+                if (Visible)
+                {
+                    if (collapsedToBall) ExpandFromBall();
+                    Activate();
+                }
                 SetupTrayIcon();
             });
-            trayMenu.Items.Add(settings.AlwaysOnTop ? "Always on top: On" : "Always on top: Off", null, (s, e) =>
+            trayMenu.Items.Add(T("立即刷新", "Refresh now"), null, async (s, e) => await RefreshAllAsync(true));
+            trayMenu.Items.Add(new ToolStripSeparator());
+
+            var pinItem = new ToolStripMenuItem(T("置顶显示", "Always on top"))
+            {
+                Checked = settings.AlwaysOnTop,
+                CheckOnClick = false
+            };
+            pinItem.Click += (s, e) =>
             {
                 settings.AlwaysOnTop = !settings.AlwaysOnTop;
                 TopMost = settings.AlwaysOnTop;
                 settings.Save();
                 SetupTrayIcon();
                 Invalidate();
-            });
-            trayMenu.Items.Add(string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase) ? "Switch to compact" : "Switch to edge", null, (s, e) =>
+            };
+            trayMenu.Items.Add(pinItem);
+
+            var modeMenu = new ToolStripMenuItem(T("面板模式", "Panel mode"));
+            var compactItem = new ToolStripMenuItem(T("紧凑", "Compact"))
             {
-                settings.WidgetMode = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase) ? "compact" : "edge";
-                ApplyLayoutMinimumSize();
-                ApplyIdealSize();
+                Checked = !string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase)
+            };
+            compactItem.Click += (s, e) => SetWidgetMode("compact");
+            var detailedItem = new ToolStripMenuItem(T("详细", "Detailed"))
+            {
+                Checked = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase)
+            };
+            detailedItem.Click += (s, e) => SetWidgetMode("edge");
+            modeMenu.DropDownItems.Add(compactItem);
+            modeMenu.DropDownItems.Add(detailedItem);
+            trayMenu.Items.Add(modeMenu);
+
+            var displayMenu = new ToolStripMenuItem(T("显示额度", "Visible quotas"));
+            var claudeItem = new ToolStripMenuItem("Claude") { Checked = settings.ShowClaude };
+            claudeItem.Click += (s, e) => SetServiceVisible("Claude", !settings.ShowClaude);
+            var codexItem = new ToolStripMenuItem("Codex") { Checked = settings.ShowCodex };
+            codexItem.Click += (s, e) => SetServiceVisible("Codex", !settings.ShowCodex);
+            displayMenu.DropDownItems.Add(claudeItem);
+            displayMenu.DropDownItems.Add(codexItem);
+            trayMenu.Items.Add(displayMenu);
+
+            var opacityMenu = new ToolStripMenuItem(T("透明度", "Opacity"));
+            AddPercentMenuItems(opacityMenu, new[] { 50, 70, 85, 94, 100 }, settings.OpacityPercent, SetOpacityPercent);
+            trayMenu.Items.Add(opacityMenu);
+
+            var sizeMenu = new ToolStripMenuItem(T("整体尺寸", "Overall size"));
+            AddPercentMenuItems(sizeMenu, new[] { 75, 90, 100, 115, 130, 150 }, settings.OverallScalePercent, SetOverallScalePercent);
+            trayMenu.Items.Add(sizeMenu);
+
+            var behaviorMenu = new ToolStripMenuItem(T("自动隐藏", "Auto hide"));
+            var collapseItem = new ToolStripMenuItem(T("离开后缩成悬浮球", "Collapse to quota ball"))
+            {
+                Checked = settings.CollapseToBall
+            };
+            collapseItem.Click += (s, e) =>
+            {
+                settings.CollapseToBall = !settings.CollapseToBall;
+                if (!settings.CollapseToBall && collapsedToBall) ExpandFromBall();
                 settings.Save();
                 SetupTrayIcon();
-                Invalidate();
-            });
-            trayMenu.Items.Add("Settings", null, async (s, e) => await ShowSettingsDialog());
-            trayMenu.Items.Add("Exit", null, (s, e) => Close());
+            };
+            var edgeHideItem = new ToolStripMenuItem(T("悬浮球贴外缘缩边", "Retract ball at outer edge"))
+            {
+                Checked = settings.EdgeAutoHide,
+                Enabled = settings.CollapseToBall
+            };
+            edgeHideItem.Click += (s, e) =>
+            {
+                settings.EdgeAutoHide = !settings.EdgeAutoHide;
+                if (collapsedToBall)
+                {
+                    if (settings.EdgeAutoHide)
+                    {
+                        Rectangle expandedBounds = new Rectangle(expandedLocation, expandedSize);
+                        Screen sourceScreen = Screen.FromRectangle(expandedBounds);
+                        collapsedScreenDeviceName = sourceScreen.DeviceName;
+                        collapsedWorkArea = sourceScreen.WorkingArea;
+                        collapsedDockEdge = NearestDockEdge(expandedBounds, collapsedWorkArea, UiScale(16));
+                        if (!IsOuterDockEdge(sourceScreen, collapsedDockEdge))
+                            collapsedDockEdge = "";
+                    }
+                    else
+                    {
+                        collapsedDockEdge = "";
+                    }
+                    ResizeCollapsedBallForCurrentDpi();
+                }
+                settings.Save();
+                SetupTrayIcon();
+            };
+            behaviorMenu.DropDownItems.Add(collapseItem);
+            behaviorMenu.DropDownItems.Add(edgeHideItem);
+            trayMenu.Items.Add(behaviorMenu);
+
+            var languageMenu = new ToolStripMenuItem(T("语言", "Language"));
+            var chineseItem = new ToolStripMenuItem("简体中文") { Checked = !English };
+            chineseItem.Click += (s, e) => SetLanguage("zh-CN");
+            var englishItem = new ToolStripMenuItem("English") { Checked = English };
+            englishItem.Click += (s, e) => SetLanguage("en");
+            languageMenu.DropDownItems.Add(chineseItem);
+            languageMenu.DropDownItems.Add(englishItem);
+            trayMenu.Items.Add(languageMenu);
+
+            trayMenu.Items.Add(T("完整设置…", "Settings…"), null, async (s, e) => await ShowSettingsDialog());
+            trayMenu.Items.Add(new ToolStripSeparator());
+            trayMenu.Items.Add(T("退出 Headroom", "Exit Headroom"), null, (s, e) => Close());
 
             trayIcon.Text = "Headroom";
             if (trayIcon.Icon == null)
@@ -698,9 +888,70 @@ namespace Headroom
             trayIcon.Visible = true;
         }
 
+        void AddPercentMenuItems(ToolStripMenuItem parent, int[] values, int current, Action<int> apply)
+        {
+            foreach (int value in values)
+            {
+                var item = new ToolStripMenuItem(value + "%") { Checked = value == current };
+                int captured = value;
+                item.Click += (s, e) => apply(captured);
+                parent.DropDownItems.Add(item);
+            }
+        }
+
+        void SetWidgetMode(string mode)
+        {
+            settings.WidgetMode = string.Equals(mode, "edge", StringComparison.OrdinalIgnoreCase) ? "edge" : "compact";
+            ApplyIdealSize();
+            settings.Save();
+            SetupTrayIcon();
+            Invalidate();
+        }
+
+        void SetServiceVisible(string service, bool visible)
+        {
+            if (service == "Claude") settings.ShowClaude = visible;
+            else settings.ShowCodex = visible;
+            if (!settings.ShowClaude && !settings.ShowCodex)
+            {
+                if (service == "Claude") settings.ShowCodex = true;
+                else settings.ShowClaude = true;
+            }
+            ApplyIdealSize();
+            settings.Save();
+            SetupTrayIcon();
+            Invalidate();
+        }
+
+        void SetOpacityPercent(int value)
+        {
+            settings.OpacityPercent = Math.Max(35, Math.Min(100, value));
+            settings.Save();
+            SetupTrayIcon();
+            Invalidate();
+        }
+
+        void SetOverallScalePercent(int value)
+        {
+            settings.OverallScalePercent = Math.Max(70, Math.Min(150, value));
+            ApplyIdealSize();
+            settings.Save();
+            SetupTrayIcon();
+            Invalidate();
+        }
+
+        void SetLanguage(string language)
+        {
+            settings.Language = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh-CN";
+            settings.Save();
+            SetupTrayIcon();
+            Invalidate();
+        }
+
         void OnTrayIconDoubleClick(object sender, EventArgs e)
         {
             Visible = true;
+            if (collapsedToBall) ExpandFromBall();
             Activate();
             SetupTrayIcon();
         }
