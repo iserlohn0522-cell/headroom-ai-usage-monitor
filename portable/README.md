@@ -1,4 +1,4 @@
-# Headroom portable sphere - 3.0.0-preview.20261002.4
+# Headroom portable sphere - 3.0.0-preview.20261002.5
 
 Python 3.10+ with Tk 8.6 (verified). A newer Tk major version is not automatically compatible; see the Linux Chinese rendering check below. Runtime uses only the standard library; Pillow is optional for Windows screenshot QA. Extract the source ZIP and run from its top-level folder:
 
@@ -70,5 +70,7 @@ python -m portable.app --smoke-test docs/previews/portable-sphere
 Build a source ZIP without local settings/caches:
 
 ```shell
-python3 -m portable.package --version 3.0.0-preview.20261002.4 --output releases/Headroom-portable-v3.0.0-preview.20261002.4.zip
+python3 -m portable.package --version 3.0.0-preview.20261002.5 --output releases/Headroom-portable-v3.0.0-preview.20261002.5.zip
 ```
+
+Revision 5 fixes repeated canvas-drag jumps with decorated X11 windows by using WM geometry consistently. The portable suite now has 18 tests, including simulated decoration offsets and repeated real Tk dragging. Actual decorated Linux retesting is reported separately.
