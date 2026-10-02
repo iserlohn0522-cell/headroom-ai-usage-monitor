@@ -15,7 +15,7 @@ def main():
     args.output.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(args.output,"x",zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(files):archive.write(path,path.relative_to(root).as_posix())
-        archive.writestr("START-HERE.txt",f"Headroom portable {args.version}\nPython 3.10+ and Tk 8.6+ required. See portable/README.md for setup, sphere mapping and platform coverage.\nRun: python -m portable.app --settings preview-settings.json\nNo account required for the labeled demo.\n")
+        archive.writestr("START-HERE.txt",f"Headroom portable {args.version}\nPython 3.10+ and verified Tk 8.6 required; newer Tk needs visual font validation. See portable/README.md for setup, sphere mapping and platform coverage.\nLinux (Debian/Ubuntu): /usr/bin/python3 -m portable.app --settings preview-settings.json\nmacOS: python3 -m portable.app --settings preview-settings.json\nWindows: python -m portable.app --settings preview-settings.json\nLinux: prefer distro Python/Tk; bundled Tk 9.0.4 showed incorrect Chinese rendering in QA despite passing tests. Follow the README preflight.\nNo account required for the labeled demo.\n")
     with zipfile.ZipFile(args.output) as archive:
         assert archive.testzip() is None
     print(args.output)

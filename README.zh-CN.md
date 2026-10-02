@@ -23,3 +23,5 @@ python -m portable.app --providers .local-demo/manifest.json
 自定义提供方使用[版本化本地 JSON 接口](docs/providers/README.md)，包含窗口 ID、能力、状态、余额、观测时间及重置语义。Headroom 不执行提供方脚本，不索取其凭据。安全 mock 可演示耗尽、更新、过期和错误。可选 `--codex-cli` 仅通过现有已登录 CLI 读取额度；本次验证模拟协议，未调用真实账号。
 
 [平台覆盖](portable/README.md) · [截图与验证](docs/previews/current/README.md) · [英文说明](README.md)
+
+Linux 启动：Debian/Ubuntu 请使用 `/usr/bin/python3 -m portable.app`，优先选择发行版 Python/Tk 8.6。实测某打包 Python/Tk 9.0.4 即使通过测试、已安装 Noto CJK，中文仍显示异常。请按[Linux 中文预检](portable/README.md#linux-runtime-and-chinese-preflight)检查菜单和图例；程序不会自动更改系统或安装软件。
