@@ -169,7 +169,7 @@ $env:HEADROOM_KEEP_TEST_ARTIFACTS = '1'
 python -m unittest discover -s tests -p test_portable.py -v
 ```
 
-Windows was built and visually exercised here. macOS/Linux runtime verification remains pending. No new OAuth grants or live authenticated calls were made for this change.
+Windows was built and visually exercised here. [Hosted CI](https://github.com/iserlohn0522-cell/headroom-ai-usage-monitor/actions/runs/37033746827) also passed all 16 portable tests on Windows, macOS arm64 and Linux, including actual Tk integration (Linux under Xvfb). Manual macOS/Linux desktop behavior remains unverified. No new OAuth grants or live authenticated calls were made for this change.
 
 ## Portable sphere
 

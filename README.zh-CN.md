@@ -1,10 +1,10 @@
 # Headroom 额度小组件
 
-现有 Windows 原生程序继续支持 Claude Code 和 Codex；仓库内新增 Python/Tk 前端，适配 macOS/Linux 的窗口、字体和设置路径。**实际验证环境为 Windows；未在 macOS/Linux 上运行。**
+现有 Windows 原生程序继续支持 Claude Code 和 Codex；仓库内新增 Python/Tk 前端，适配 macOS/Linux 的窗口、字体和设置路径。**Windows 已完成本地可视化验证；[CI](https://github.com/iserlohn0522-cell/headroom-ai-usage-monitor/actions/runs/37033746827) 已在 Windows、macOS arm64 和 Linux 通过 16 项测试，包括真实 Tk 界面集成（Linux 使用 Xvfb）。仍未完成 macOS/Linux 人工桌面验证。**
 
 右键可选三种皮肤：午夜（柔和深色）、纸张（浅色卡片）、终端（等宽字体、分段进度条）。默认简体中文，也可选择 English；旧日语设置迁移为中文，英语保留。
 
-悬浮球显示一个“提供方 + 窗口”，如 `CX 7d` 表示 Codex 每周剩余额度，不再平均不同额度。仅报告每周额度时，自动显示每周并说明“无 5h 窗口”；其他计划仍显示其支持的 5 小时窗口。规则依据实际能力，不硬编码 Pro 名称。
+悬浮球的外圈表示 Claude 5h，内圈表示 Claude 每周额度，中央液体面积表示 Codex 每周剩余额度。仅在真实报告 Codex 5h 时显示额外细圈，不支持的窗口不显示虚假空条。悬停查看图例、状态和重置时间。各额度独立显示，不进行平均。
 
 - `0% / 已用尽`：真实余额为零。
 - `— / 无数据`：无可用数值，不是零。
