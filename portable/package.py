@@ -10,7 +10,7 @@ def main():
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     files=set()
-    for pattern in ("portable/*.py","portable/README.md","examples/providers/*.py","examples/providers/*.json","docs/providers/*.md","docs/providers/*.json","docs/fixtures/*/*.json","tests/test_portable*.py","tests/allowance-cases.json","LICENSE","README.md","README.zh-CN.md"):
+    for pattern in ("portable/*.py","portable/README.md","examples/providers/*.py","examples/providers/*.json","docs/providers/*.md","docs/providers/*.json","docs/previews/current/*","docs/fixtures/*/*.json","tests/test_portable*.py","tests/allowance-cases.json","LICENSE","README.md","README.zh-CN.md"):
         files.update(p for p in root.glob(pattern) if p.is_file())
     args.output.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(args.output,"x",zipfile.ZIP_DEFLATED) as archive:

@@ -36,7 +36,7 @@ Settings: Windows `%LOCALAPPDATA%/Headroom/portable-settings.json`; macOS `~/Lib
 
 Locally verified on Windows: 16 Python tests, including 17 shared quota cases, 11 area round trips, polygon area tolerance, fixed slots/error isolation, actual Tk controls/provider recovery and hover legend. The sphere screenshot matrix includes all skins, 0/1/25/50/75/99/100%, both-window plans, loading, unknown, unsupported, stale and per-provider errors.
 
-The repository CI matrix exercises Windows/macOS/Linux synthetic tests, with Linux Tk under Xvfb. CI results are reported separately; interactive macOS/Linux desktop behavior, multi-monitor scaling, sleep/wake, tray, native Wayland and macOS packaging remain unverified. No notarized app bundle, AppImage or bundled Python runtime is supplied.
+The repository CI matrix exercises Windows/macOS/Linux synthetic tests, with Linux Tk under Xvfb. At delivery, GitHub had registered no workflows or runs on this fork, so macOS/Linux execution is still unverified and the draft PR remains pending CI activation; interactive macOS/Linux desktop behavior, multi-monitor scaling, sleep/wake, tray, native Wayland and macOS packaging remain unverified. No notarized app bundle, AppImage or bundled Python runtime is supplied.
 
 ```shell
 python3 -m unittest discover -s tests -p 'test_portable*.py' -v
