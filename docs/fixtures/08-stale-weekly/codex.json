@@ -1,0 +1,10 @@
+{
+  "primary_window": {
+    "used_percent": 32,
+    "limit_window_seconds": 604800,
+    "reset_at": 1791288000
+  },
+  "_headroom": {
+    "observedAt": "2026-01-01T00:00:00Z"
+  }
+}

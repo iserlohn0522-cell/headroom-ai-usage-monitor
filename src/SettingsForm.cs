@@ -219,7 +219,7 @@ namespace Headroom
             AddNumberRow(rightCard, "文字缩放 (%)", "Text scale (%)", "", "", textScale, settings.TextScalePercent, ref rightY, 70, 150);
             AddNumberRow(rightCard, "额度条高度 (px)", "Quota bar height (px)", "", "", barHeight, settings.BarHeight, ref rightY, 8, 24);
             AddNumberRow(rightCard, "面板按钮尺寸 (px)", "Panel button size (px)", "", "", actionButtonSize, settings.ActionButtonSize, ref rightY, 24, 40);
-            AddNumberRow(rightCard, "悬浮球尺寸 (px)", "Quota ball size (px)", "", "", ballSize, settings.BallSize, ref rightY, 32, 64);
+            AddNumberRow(rightCard, "悬浮球尺寸 (px)", "Quota ball size (px)", "", "", ballSize, settings.BallSize, ref rightY, 64, 96);
             AddSection(rightCard, "更新", "Refresh", ref rightY);
             AddNumberRow(rightCard, "正常更新间隔 (分钟)", "Normal interval (min)", "", "", normal, settings.NormalIntervalMinutes, ref rightY, 1, 240);
             AddSection(rightCard, "阈值", "Thresholds", ref rightY);
@@ -592,7 +592,7 @@ namespace Headroom
             StyleNumber(textScale, settings.TextScalePercent, 70, 150);
             StyleNumber(barHeight, settings.BarHeight, 8, 24);
             StyleNumber(actionButtonSize, settings.ActionButtonSize, 24, 40);
-            StyleNumber(ballSize, settings.BallSize, 32, 64);
+            StyleNumber(ballSize, settings.BallSize, 64, 96);
             StyleNumber(collapseDelay, settings.CollapseDelayMilliseconds, 300, 5000);
         }
 
@@ -872,12 +872,11 @@ namespace Headroom
             settings.TextScalePercent = ReadBoxInt(textScale, settings.TextScalePercent, 70, 150);
             settings.BarHeight = ReadBoxInt(barHeight, settings.BarHeight, 8, 24);
             settings.ActionButtonSize = ReadBoxInt(actionButtonSize, settings.ActionButtonSize, 24, 40);
-            settings.BallSize = ReadBoxInt(ballSize, settings.BallSize, 32, 64);
+            settings.BallSize = ReadBoxInt(ballSize, settings.BallSize, 64, 96);
             settings.CollapseDelayMilliseconds = ReadBoxInt(collapseDelay, settings.CollapseDelayMilliseconds, 300, 5000);
             settings.Language = language.SelectedIndex == 1 ? "en" : "zh-CN";
             settings.BoostDurationMinutes = ReadBoxInt(boostDuration, settings.BoostDurationMinutes, 1, 240);
             settings.BoostIntervalMinutes = ReadBoxInt(boostInterval, settings.BoostIntervalMinutes, 1, 240);
-            if (showCodex.SelectedIndex == 1 && showClaude.SelectedIndex == 1) showClaude.SelectedIndex = 0;
             settings.ShowCodex  = showCodex.SelectedIndex  == 0;
             settings.ShowClaude = showClaude.SelectedIndex == 0;
             settings.CollapseToBall = collapseToBall.SelectedIndex == 0;

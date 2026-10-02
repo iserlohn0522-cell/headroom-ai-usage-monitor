@@ -68,3 +68,13 @@ $RECYCLE.BIN/
 *.temp
 *.swp
 *.orig
+
+# Portable Python / isolated visual QA settings
+__pycache__/
+*.pyc
+/docs/previews/**/preview-settings.json
+/docs/previews/**/isolated-portable-settings.json
+/.local-demo/
+
+/docs/previews/**/native-provider-smoke/
+/docs/previews/**/codex.json

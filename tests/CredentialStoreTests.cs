@@ -18,7 +18,8 @@ namespace Headroom
             }
             finally
             {
-                try { Directory.Delete(dir, true); } catch { }
+                if (Environment.GetEnvironmentVariable("HEADROOM_KEEP_TEST_ARTIFACTS") != "1")
+                    try { Directory.Delete(dir, true); } catch { }
             }
         }
 

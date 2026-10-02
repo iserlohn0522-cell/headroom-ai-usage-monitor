@@ -21,6 +21,13 @@ namespace Headroom
         static void Main()
         {
             HeadroomOptions.Configure(Environment.GetCommandLineArgs());
+            if (HeadroomOptions.PreviewDirectory != null) {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                try { UsageForm.RenderPreviews(HeadroomOptions.PreviewDirectory); }
+                catch(Exception error) { Directory.CreateDirectory(HeadroomOptions.PreviewDirectory); File.WriteAllText(Path.Combine(HeadroomOptions.PreviewDirectory,"preview-error.txt"),error.ToString()); Environment.ExitCode=1; }
+                return;
+            }
             string mutexName = HeadroomOptions.FixtureMode
                 ? @"Local\Headroom.Fixture.Instance"
                 : @"Local\Headroom.Instance";
@@ -57,6 +64,8 @@ namespace Headroom
     static class HeadroomOptions
     {
         public static bool FixtureMode { get; private set; }
+        public static string ProviderManifest { get; private set; }
+        public static string PreviewDirectory { get; private set; }
         public static string FixtureDir { get; private set; }
 
         public static void Configure(string[] args)
@@ -73,6 +82,8 @@ namespace Headroom
             for (int i = 1; i < args.Length; i++)
             {
                 string arg = args[i] ?? "";
+                if (arg == "--render-previews" && i + 1 < args.Length) { PreviewDirectory=Path.GetFullPath(args[++i]); FixtureMode=true; FixtureDir=PreviewDirectory; continue; }
+                if (arg == "--providers" && i + 1 < args.Length) { ProviderManifest = args[++i]; continue; }
                 if (arg.Equals("--fixture", StringComparison.OrdinalIgnoreCase))
                 {
                     FixtureMode = true;

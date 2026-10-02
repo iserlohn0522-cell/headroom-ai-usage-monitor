@@ -9,6 +9,9 @@ New-Item -ItemType Directory -Force -Path $Out | Out-Null
 
 $Sources = @(
   (Join-Path $Root "src\Models.cs"),
+  (Join-Path $Root "src\QuotaPresentation.cs"),
+  (Join-Path $Root "src\WidgetSkin.cs"),
+  (Join-Path $Root "src\AllowanceProviders.cs"),
   (Join-Path $Root "src\DebugLog.cs"),
   (Join-Path $Root "src\FileWrites.cs"),
   (Join-Path $Root "src\Json.cs"),
@@ -18,6 +21,7 @@ $Sources = @(
   (Join-Path $Root "src\ResetTimes.cs"),
   (Join-Path $Root "src\RefreshPolicy.cs"),
   (Join-Path $Root "tests\ParserTests.cs"),
+  (Join-Path $Root "tests\AllowanceTests.cs"),
   (Join-Path $Root "tests\CredentialStoreTests.cs"),
   (Join-Path $Root "tests\RefreshPolicyTests.cs"),
   (Join-Path $Root "tests\SettingsStoreTests.cs"),

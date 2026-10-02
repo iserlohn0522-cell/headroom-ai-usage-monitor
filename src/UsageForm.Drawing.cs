@@ -30,8 +30,6 @@ namespace Headroom
                 return;
             }
 
-            settings.CodexShowUsed = false;
-            settings.ClaudeShowUsed = false;
             DrawCustomBatteryWidget(g);
             DrawSideRail(g);
         }
@@ -50,7 +48,8 @@ namespace Headroom
                 if (settings.ShowClaude) items.Add(Tuple.Create(claude, "claude"));
                 if (settings.ShowCodex) items.Add(Tuple.Create(codex, "codex"));
             }
-            if (items.Count == 0) items.Add(Tuple.Create(claude, "claude"));
+            foreach (var custom in customProviders) items.Add(Tuple.Create(custom, custom.Name));
+            if (items.Count == 0) items.Add(Tuple.Create(noProviders, "none"));
             return items;
         }
 
@@ -75,7 +74,7 @@ namespace Headroom
 
         Size IdealWidgetSize()
         {
-            return WidgetLayoutMetrics.IdealSize(settings, runtimeDpi);
+            return AllowancePanelSize();
         }
 
         Size SavedWidgetSizeForCurrentDpi()
@@ -220,8 +219,8 @@ namespace Headroom
         {
             hits[key] = r;
             bool hover = hoverKey == key;
-            Color top = hover ? Color.FromArgb(66, 76, 91) : Color.FromArgb(39, 45, 54);
-            Color bottom = hover ? Color.FromArgb(48, 58, 72) : Color.FromArgb(29, 34, 42);
+            Color top = Skin.Surface;
+            Color bottom = Skin.Surface;
             using (var path = RoundRect(r.X, r.Y, r.Width, r.Height, Math.Max(6, r.Width / 4)))
             using (var bg = new System.Drawing.Drawing2D.LinearGradientBrush(r, top, bottom, 90f))
             using (var border = new Pen(hover ? Color.FromArgb(100, 126, 160) : Color.FromArgb(58, 67, 80), 0.8f))
@@ -232,139 +231,15 @@ namespace Headroom
 
             int inset = Math.Max(4, r.Width / 5);
             var iconRect = Rectangle.Inflate(r, -inset, -inset);
-            painter(g, iconRect, hover ? Color.White : color);
+            painter(g, iconRect, Skin.Text);
         }
 
-        void DrawCustomBatteryWidget(Graphics g)
-        {
-            bool edge = string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase);
-            int radius = UiScale(8);
-            using (var path = RoundRect(0, 0, Math.Max(1, ClientSize.Width - 1), Math.Max(1, ClientSize.Height - 1), radius))
-            {
-                Color top = edge ? Color.FromArgb(28, 31, 37) : Color.FromArgb(24, 27, 32);
-                Color bottom = edge ? Color.FromArgb(18, 20, 24) : Color.FromArgb(17, 20, 24);
-                using (var grad = new System.Drawing.Drawing2D.LinearGradientBrush(ClientRectangle, top, bottom, 90f))
-                    g.FillPath(grad, path);
-                using (var border = new Pen(Color.FromArgb(65, 72, 82), 0.9f))
-                    g.DrawPath(border, path);
-            }
-
-            int rowCount = CountBatteryRows();
-            if (rowCount == 0) rowCount = 1;
-            int pad = UiScale(edge ? 8 : 6);
-            int buttonGap = UiScale(4);
-            int actionSpace = (edge ? ActionButtonPixels() : ActionButtonPixels() * 2 + buttonGap) + UiScale(10);
-            int rowGap = UiScale(edge ? 4 : 2);
-            int rowH = UiScaleTextRow(edge ? 25 : 19);
-            int rowW = Math.Max(UiScale(120), ClientSize.Width - pad * 2 - actionSpace);
-            int contentHeight = rowCount * rowH + Math.Max(0, rowCount - 1) * rowGap;
-            int y = Math.Max(pad, (ClientSize.Height - contentHeight) / 2);
-
-            foreach (var item in VisibleServices())
-            {
-                ServiceState service = item.Item1;
-                Color fiveColor = service.Name == "Codex" ? CodexFiveColor() : ClaudeFiveColor();
-                Color weekColor = service.Name == "Codex" ? CodexWeekColor() : ClaudeWeekColor();
-                DrawBatteryRow(g, "5h", service, false, pad, y, rowW, rowH,
-                    BatteryColor(service.Data.FiveHourRemainingPercent(), fiveColor), edge);
-                y += rowH + rowGap;
-                DrawBatteryRow(g, "7d", service, true, pad, y, rowW, rowH,
-                    BatteryColor(service.Data.WeeklyRemainingPercent(), weekColor), edge);
-                y += rowH + rowGap;
-            }
-        }
-
-        int CountBatteryRows()
-        {
-            int count = 0;
-            if (settings.ShowCodex) count += 2;
-            if (settings.ShowClaude) count += 2;
-            return count;
-        }
-
-        Color CodexFiveColor() { return Color.FromArgb(132, 205, 252); }
-        Color CodexWeekColor() { return Color.FromArgb(31, 101, 214); }
-        Color ClaudeFiveColor() { return Color.FromArgb(215, 154, 101); }
-        Color ClaudeWeekColor() { return Color.FromArgb(155, 90, 54); }
-
-        void DrawQuotaBall(Graphics g)
-        {
-            hits["ball"] = ClientRectangle;
-            int diameter = Math.Max(20, Math.Min(ClientSize.Width, ClientSize.Height) - 2);
-            int x = (ClientSize.Width - diameter) / 2;
-            int y = (ClientSize.Height - diameter) / 2;
-            var circle = new Rectangle(x, y, diameter, diameter);
-
-            using (var shadow = new SolidBrush(Color.FromArgb(90, 0, 0, 0)))
-                g.FillEllipse(shadow, x + 1, y + 2, diameter - 1, diameter - 1);
-            using (var fill = new System.Drawing.Drawing2D.LinearGradientBrush(
-                circle, Color.FromArgb(43, 49, 61), Color.FromArgb(19, 23, 30), 135f))
-                g.FillEllipse(fill, circle);
-
-            var quotas = new List<Tuple<int?, Color>>();
-            if (settings.ShowCodex)
-            {
-                quotas.Add(Tuple.Create(codex.Data.FiveHourRemainingPercent(), CodexFiveColor()));
-                quotas.Add(Tuple.Create(codex.Data.WeeklyRemainingPercent(), CodexWeekColor()));
-            }
-            if (settings.ShowClaude)
-            {
-                quotas.Add(Tuple.Create(claude.Data.FiveHourRemainingPercent(), ClaudeFiveColor()));
-                quotas.Add(Tuple.Create(claude.Data.WeeklyRemainingPercent(), ClaudeWeekColor()));
-            }
-            if (quotas.Count == 0)
-                quotas.Add(Tuple.Create<int?, Color>(null, Color.FromArgb(120, 130, 145)));
-
-            float ringWidth = Math.Max(3.2f, diameter * 0.105f);
-            float inset = ringWidth / 2f + 2f;
-            var ringRect = new RectangleF(
-                x + inset, y + inset,
-                diameter - inset * 2f, diameter - inset * 2f);
-            float sector = 360f / quotas.Count;
-            float gap = Math.Min(11f, sector * 0.14f);
-            float trackSpan = sector - gap;
-            int total = 0;
-            int known = 0;
-
-            for (int i = 0; i < quotas.Count; i++)
-            {
-                float start = -90f + i * sector + gap / 2f;
-                using (var track = new Pen(Color.FromArgb(78, 88, 101), ringWidth)
-                {
-                    StartCap = System.Drawing.Drawing2D.LineCap.Round,
-                    EndCap = System.Drawing.Drawing2D.LineCap.Round
-                })
-                    g.DrawArc(track, ringRect, start, trackSpan);
-
-                int? remaining = quotas[i].Item1;
-                if (!remaining.HasValue) continue;
-                int clamped = Math.Max(0, Math.Min(100, remaining.Value));
-                total += clamped;
-                known++;
-                float amount = Math.Max(clamped == 0 ? 2.5f : 3f, trackSpan * clamped / 100f);
-                Color quotaColor = BatteryColor(clamped, quotas[i].Item2);
-                using (var quotaPen = new Pen(quotaColor, ringWidth)
-                {
-                    StartCap = System.Drawing.Drawing2D.LineCap.Round,
-                    EndCap = System.Drawing.Drawing2D.LineCap.Round
-                })
-                    g.DrawArc(quotaPen, ringRect, start, Math.Min(trackSpan, amount));
-            }
-
-            string centerText = known > 0
-                ? Math.Round(total / (double)known).ToString(CultureInfo.InvariantCulture)
-                : "··";
-            float fontSize = Math.Max(7f, diameter * 0.22f);
-            using (var font = new Font("Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel))
-            {
-                TextRenderer.DrawText(
-                    g, centerText, font, circle,
-                    Color.FromArgb(236, 241, 248),
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-            }
-            using (var highlight = new Pen(Color.FromArgb(52, 255, 255, 255), 1f))
-                g.DrawArc(highlight, x + 3, y + 3, diameter - 7, diameter - 7, 205f, 105f);
-        }
+        void DrawCustomBatteryWidget(Graphics g) { PaintAllowancePanel(g); }
+        void DrawQuotaBall(Graphics g) { PaintAllowanceBall(g); }
+        Color CodexFiveColor() { return Color.FromArgb(103,187,255); }
+        Color CodexWeekColor() { return Color.FromArgb(103,187,255); }
+        Color ClaudeFiveColor() { return Color.FromArgb(215,154,101); }
+        Color ClaudeWeekColor() { return Color.FromArgb(215,154,101); }
 
         Color BatteryColor(int? remaining, Color normal)
         {

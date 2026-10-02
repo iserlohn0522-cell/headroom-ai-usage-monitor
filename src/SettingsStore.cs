@@ -35,7 +35,7 @@ namespace Headroom
                 }
 
                 int storedSettingsVersion = ReadInt(root, "settingsVersion", 0);
-                bool needsUiMigration = storedSettingsVersion < WidgetSettings.CurrentSettingsVersion;
+                bool needsUiMigration = storedSettingsVersion < 2;
                 bool needsCanonicalSave = false;
                 settings.SettingsVersion = storedSettingsVersion;
                 settings.Width = ReadInt(root, "width", settings.Width);
@@ -53,13 +53,18 @@ namespace Headroom
                 settings.TextScalePercent = Clamp(ReadInt(root, "textScalePercent", settings.TextScalePercent), 70, 150);
                 settings.BarHeight = Clamp(ReadInt(root, "barHeight", settings.BarHeight), 8, 24);
                 settings.ActionButtonSize = Clamp(ReadInt(root, "actionButtonSize", settings.ActionButtonSize), 24, 40);
-                settings.BallSize = Clamp(ReadInt(root, "ballSize", settings.BallSize), 32, 64);
+                settings.BallSize = Clamp(ReadInt(root, "ballSize", settings.BallSize), 64, 96);
+                settings.Skin = WidgetSkin.Normalize(ReadString(root, "skin", "midnight"));
+                settings.BallService = ReadString(root, "ballService", "codex");
+                settings.BallWindow = ReadString(root, "ballWindow", "auto");
+                settings.ProviderManifest = ReadString(root, "providerManifest", "");
+                if (storedSettingsVersion < 3) { settings.SettingsVersion = 3; needsCanonicalSave = true; }
                 settings.CollapseToBall = ReadBool(root, "collapseToBall", settings.CollapseToBall);
                 settings.EdgeAutoHide = ReadBool(root, "edgeAutoHide", settings.EdgeAutoHide);
                 settings.CollapseDelayMilliseconds = Clamp(ReadInt(root, "collapseDelayMilliseconds", settings.CollapseDelayMilliseconds), 300, 5000);
                 settings.ShowCodex = ReadBool(root, "showCodex", settings.ShowCodex);
                 settings.ShowClaude = ReadBool(root, "showClaude", settings.ShowClaude);
-                if (!settings.ShowCodex && !settings.ShowClaude)
+                if (!settings.ShowCodex && !settings.ShowClaude && storedSettingsVersion < 3 && string.IsNullOrWhiteSpace(settings.ProviderManifest))
                 {
                     settings.ShowClaude = true;
                     needsCanonicalSave = true;
@@ -115,6 +120,10 @@ namespace Headroom
                     { "barHeight", settings.BarHeight },
                     { "actionButtonSize", settings.ActionButtonSize },
                     { "ballSize", settings.BallSize },
+                    { "skin", settings.Skin },
+                    { "ballService", settings.BallService },
+                    { "ballWindow", settings.BallWindow },
+                    { "providerManifest", settings.ProviderManifest },
                     { "collapseToBall", settings.CollapseToBall },
                     { "edgeAutoHide", settings.EdgeAutoHide },
                     { "collapseDelayMilliseconds", settings.CollapseDelayMilliseconds },
@@ -170,7 +179,7 @@ namespace Headroom
             return string.Equals(value, "vertical", StringComparison.OrdinalIgnoreCase) ? "vertical" : "horizontal";
         }
 
-        static string NormalizeLanguage(string value)
+        internal static string NormalizeLanguage(string value)
         {
             return string.Equals(value, "en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh-CN";
         }
