@@ -32,6 +32,21 @@ class PortableUiTests(unittest.TestCase):
             finish()
             self.assertEqual(select(app.snapshots,app.settings).window.remaining,68)
             self.assertEqual(len(app.views()),1)
+            # With a real WM, decorations must not accumulate across drags.
+            root.deiconify();root.geometry("+200+200");root.update()
+            for _ in range(2):
+                before=(root.winfo_rootx(),root.winfo_rooty())
+                app.start_drag(argparse.Namespace(x_root=500,y_root=400))
+                event=argparse.Namespace(x_root=520,y_root=420)
+                app.move_drag(event);app.release_drag(event)
+                deadline=time.monotonic()+2
+                while time.monotonic()<deadline:
+                    root.update()
+                    after=(root.winfo_rootx(),root.winfo_rooty())
+                    if after==(before[0]+20,before[1]+20):break
+                    time.sleep(.01)
+                self.assertEqual(after,(before[0]+20,before[1]+20))
+
             app.set_pref("skin","paper"); app.set_pref("language","en"); app.choose_ball("demo-plan","five-hour")
             self.assertEqual(select(app.snapshots,app.settings).fallback,"preferred-unavailable")
             app.set_mode("ball");self.assertEqual(app.mode,"ball")

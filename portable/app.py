@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import queue
+import re
 import sys
 import tkinter as tk
 from tkinter import filedialog, font as tkfont, messagebox
@@ -449,12 +450,22 @@ class HeadroomApp:
 
     def start_drag(self,event):
         self.hide_legend()
-        self.drag=(event.x_root,event.y_root,self.root.winfo_x(),self.root.winfo_y())
+        # Query and set WM geometry in the same coordinate system. winfo_x/y
+        # can include client decoration offsets on X11, causing a jump per drag.
+        geometry=re.fullmatch(r"\d+x\d+([+-])(\d+)([+-])(\d+)",self.root.geometry())
+        if geometry is None:
+            self.drag=None
+            return
+        sx,left,sy,top=geometry.groups()
+        self.drag=(event.x_root,event.y_root,int(left),int(top),sx,sy)
 
     def move_drag(self,event):
         if self.drag:
-            x,y,left,top=self.drag
-            self.root.geometry(f"+{max(0,left+event.x_root-x)}+{max(0,top+event.y_root-y)}")
+            x,y,left,top,sx,sy=self.drag
+            # Negative WM offsets are distances from the right/bottom edges.
+            left=max(0,left+(event.x_root-x)*(1 if sx=="+" else -1))
+            top=max(0,top+(event.y_root-y)*(1 if sy=="+" else -1))
+            self.root.geometry(f"{sx}{left}{sy}{top}")
 
     def release_drag(self,event):
         if self.drag and abs(event.x_root-self.drag[0])+abs(event.y_root-self.drag[1])<4 and self.mode!="ball":
