@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "providers": [
+    {
+      "id": "demo-plan",
+      "path": "mock.json"
+    }
+  ]
+}

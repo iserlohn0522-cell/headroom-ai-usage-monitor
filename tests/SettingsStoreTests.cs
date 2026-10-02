@@ -22,7 +22,8 @@ namespace Headroom
             }
             finally
             {
-                try { Directory.Delete(dir, true); } catch { }
+                if (Environment.GetEnvironmentVariable("HEADROOM_KEEP_TEST_ARTIFACTS") != "1")
+                    try { Directory.Delete(dir, true); } catch { }
             }
         }
 
@@ -87,7 +88,7 @@ namespace Headroom
             Equal(105, settings.TextScalePercent, "text scale");
             Equal(16, settings.BarHeight, "bar height");
             Equal(30, settings.ActionButtonSize, "action button size");
-            Equal(48, settings.BallSize, "ball size");
+            Equal(64, settings.BallSize, "ball size migration minimum");
             True(!settings.CollapseToBall, "collapse to ball");
             True(settings.EdgeAutoHide, "edge auto-hide");
             Equal(1800, settings.CollapseDelayMilliseconds, "collapse delay");
@@ -181,7 +182,7 @@ namespace Headroom
             Equal(70, settings.TextScalePercent, "text scale clamp");
             Equal(24, settings.BarHeight, "bar height clamp");
             Equal(24, settings.ActionButtonSize, "button size clamp");
-            Equal(64, settings.BallSize, "ball size clamp");
+            Equal(96, settings.BallSize, "ball size clamp");
             Equal(300, settings.CollapseDelayMilliseconds, "collapse delay clamp");
             string canonical = File.ReadAllText(path);
             True(canonical.Contains("\"language\":\"zh-CN\""), "normalized language persisted");

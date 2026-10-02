@@ -34,6 +34,7 @@ namespace Headroom
 
         async Task HandleClickAsync(string key)
         {
+            if (key == "allowance-info") { MessageBox.Show(this, AllowanceExplanation(), "Headroom", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
             if (key == "ball")
             {
                 ExpandFromBall();
@@ -94,6 +95,7 @@ namespace Headroom
 
         string TooltipText(string key)
         {
+            if (key == "allowance-info" || key == "ball") return AllowanceExplanation();
             if (key == "pin") return T(settings.AlwaysOnTop ? "取消置顶" : "置顶显示", settings.AlwaysOnTop ? "Unpin from top" : "Always on top");
             if (key == "widgetMode")
                 return string.Equals(settings.WidgetMode, "edge", StringComparison.OrdinalIgnoreCase)
@@ -296,23 +298,24 @@ namespace Headroom
             collapsedScreenDeviceName = sourceScreen.DeviceName;
             collapsedWorkArea = workArea;
 
-            int ballSize = UiScale(Math.Max(32, Math.Min(64, settings.BallSize)));
-            int x = oldBounds.Left + (oldBounds.Width - ballSize) / 2;
-            int y = oldBounds.Top + (oldBounds.Height - ballSize) / 2;
+            Size floatingSize = FloatingSize();
+            int ballWidth=floatingSize.Width, ballHeight=floatingSize.Height;
+            int x = oldBounds.Left + (oldBounds.Width - ballWidth) / 2;
+            int y = oldBounds.Top + (oldBounds.Height - ballHeight) / 2;
             int visiblePixels = Math.Max(UiScale(10), UiScale(12));
-            if (collapsedDockEdge == "left") x = workArea.Left - ballSize + visiblePixels;
+            if (collapsedDockEdge == "left") x = workArea.Left - ballWidth + visiblePixels;
             else if (collapsedDockEdge == "right") x = workArea.Right - visiblePixels;
-            else if (collapsedDockEdge == "top") y = workArea.Top - ballSize + visiblePixels;
+            else if (collapsedDockEdge == "top") y = workArea.Top - ballHeight + visiblePixels;
             else if (collapsedDockEdge == "bottom") y = workArea.Bottom - visiblePixels;
             else
             {
-                x = Math.Max(workArea.Left, Math.Min(workArea.Right - ballSize, x));
-                y = Math.Max(workArea.Top, Math.Min(workArea.Bottom - ballSize, y));
+                x = Math.Max(workArea.Left, Math.Min(workArea.Right - ballWidth, x));
+                y = Math.Max(workArea.Top, Math.Min(workArea.Bottom - ballHeight, y));
             }
 
             collapsedToBall = true;
             MinimumSize = new Size(1, 1);
-            Bounds = new Rectangle(x, y, ballSize, ballSize);
+            Bounds = new Rectangle(x, y, ballWidth, ballHeight);
             CancelAutoCollapse();
             hoverKey = "";
             Invalidate();
@@ -383,24 +386,25 @@ namespace Headroom
             if (!settings.EdgeAutoHide || !IsOuterDockEdge(sourceScreen, collapsedDockEdge))
                 collapsedDockEdge = "";
 
-            int ballSize = UiScale(Math.Max(32, Math.Min(64, settings.BallSize)));
-            int x = Bounds.Left + (Bounds.Width - ballSize) / 2;
-            int y = Bounds.Top + (Bounds.Height - ballSize) / 2;
+            Size floatingSize = FloatingSize();
+            int ballWidth=floatingSize.Width, ballHeight=floatingSize.Height;
+            int x = Bounds.Left + (Bounds.Width - ballWidth) / 2;
+            int y = Bounds.Top + (Bounds.Height - ballHeight) / 2;
             int visiblePixels = Math.Max(UiScale(10), UiScale(12));
-            if (collapsedDockEdge == "left") x = workArea.Left - ballSize + visiblePixels;
+            if (collapsedDockEdge == "left") x = workArea.Left - ballWidth + visiblePixels;
             else if (collapsedDockEdge == "right") x = workArea.Right - visiblePixels;
-            else if (collapsedDockEdge == "top") y = workArea.Top - ballSize + visiblePixels;
+            else if (collapsedDockEdge == "top") y = workArea.Top - ballHeight + visiblePixels;
             else if (collapsedDockEdge == "bottom") y = workArea.Bottom - visiblePixels;
             else
             {
-                x = Math.Max(workArea.Left, Math.Min(workArea.Right - ballSize, x));
-                y = Math.Max(workArea.Top, Math.Min(workArea.Bottom - ballSize, y));
+                x = Math.Max(workArea.Left, Math.Min(workArea.Right - ballWidth, x));
+                y = Math.Max(workArea.Top, Math.Min(workArea.Bottom - ballHeight, y));
             }
 
             collapsedScreenDeviceName = sourceScreen.DeviceName;
             collapsedWorkArea = workArea;
             MinimumSize = new Size(1, 1);
-            Bounds = new Rectangle(x, y, ballSize, ballSize);
+            Bounds = new Rectangle(x, y, ballWidth, ballHeight);
             Invalidate();
         }
 
@@ -461,6 +465,7 @@ namespace Headroom
                         if (dlg.ResetRequested)
                         {
                             settings.ResetToDefaults();
+                            LoadCustomProviders("");
                             claude.ManuallyLoggedOut = settings.ClaudeLoggedOut;
                             codex.ManuallyLoggedOut = settings.CodexLoggedOut;
                         }

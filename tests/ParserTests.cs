@@ -57,8 +57,9 @@ namespace Headroom
                 "\"secondary_window\":{\"limits\":{\"ignored\":true},\"used_percent\":25,\"reset_at\":1779667200}" +
                 "}";
             var codex = UsageParsers.ParseCodexApi(json);
-            Equal(12.5, codex.FiveHourUsed.Value, "Codex nested 5h used");
-            Equal(25.0, codex.WeeklyUsed.Value, "Codex nested weekly used");
+            Equal(87.5, codex.Windows[0].Remaining.Value, "Codex primary without duration keeps value");
+            True(!codex.FiveHourUsed.HasValue, "Missing duration cannot invent a five-hour window");
+            Equal(75.0, codex.Windows[1].Remaining.Value, "Codex secondary without duration keeps value");
         }
 
         static void TestCodexWindowDurationMapping()
@@ -89,8 +90,10 @@ namespace Headroom
                 "\"primary_window\":{\"used_percent\":55,\"limit_window_seconds\":86400}," +
                 "\"secondary_window\":{\"used_percent\":66,\"limit_window_seconds\":2592000}}";
             var unknownDuration = UsageParsers.ParseCodexApi(unknownDurationJson);
-            Equal(55.0, unknownDuration.FiveHourUsed.Value, "Codex unknown primary duration fallback");
-            Equal(66.0, unknownDuration.WeeklyUsed.Value, "Codex unknown secondary duration fallback");
+            True(!unknownDuration.FiveHourUsed.HasValue, "Daily window is not five-hour");
+            Equal("24h", unknownDuration.Windows[0].Label, "Daily duration preserved");
+            True(!unknownDuration.WeeklyUsed.HasValue, "Monthly window is not weekly");
+            Equal("720h", unknownDuration.Windows[1].Label, "Monthly duration preserved");
         }
 
         static string ReadFixture(string root, string scenario, string fileName)

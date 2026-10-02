@@ -1,10 +1,12 @@
 {
   "primary_window": {
     "used_percent": 62.0,
-    "reset_at": 1779432000
+    "reset_at": 1779432000,
+    "limit_window_seconds": 18000
   },
   "secondary_window": {
     "used_percent": 100.0,
-    "reset_at": 1779667200
+    "reset_at": 1779667200,
+    "limit_window_seconds": 604800
   }
 }

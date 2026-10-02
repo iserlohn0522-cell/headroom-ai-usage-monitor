@@ -1,0 +1,239 @@
+[
+  {
+    "name": "pro-weekly-only",
+    "payload": {
+      "plan_type": "pro",
+      "rate_limit": {
+        "primary_window": {
+          "used_percent": 32,
+          "limit_window_seconds": 604800,
+          "reset_at": 1791302400
+        },
+        "secondary_window": null
+      }
+    },
+    "selected": "weekly",
+    "state": "Fresh",
+    "fiveSupport": "Unsupported",
+    "remaining": 68
+  },
+  {
+    "name": "plus-both",
+    "payload": {
+      "plan_type": "plus",
+      "rate_limit": {
+        "primary_window": {
+          "used_percent": 10,
+          "limit_window_seconds": 18000
+        },
+        "secondary_window": {
+          "used_percent": 30,
+          "limit_window_seconds": 604800
+        }
+      }
+    },
+    "selected": "five-hour",
+    "state": "Fresh",
+    "fiveSupport": "Supported",
+    "remaining": 90
+  },
+  {
+    "name": "pro-both-capability-wins",
+    "payload": {
+      "plan_type": "pro",
+      "primary_window": {
+        "used_percent": 10,
+        "limit_window_seconds": 18000
+      },
+      "secondary_window": {
+        "used_percent": 30,
+        "limit_window_seconds": 604800
+      }
+    },
+    "selected": "five-hour",
+    "state": "Fresh",
+    "fiveSupport": "Supported",
+    "remaining": 90
+  },
+  {
+    "name": "weekly-zero",
+    "payload": {
+      "rate_limit": {
+        "primary_window": {
+          "used_percent": 100,
+          "limit_window_seconds": 604800
+        },
+        "secondary_window": null
+      }
+    },
+    "selected": "weekly",
+    "state": "Exhausted",
+    "fiveSupport": "Unsupported",
+    "remaining": 0
+  },
+  {
+    "name": "empty-response",
+    "payload": {},
+    "selected": "five-hour",
+    "state": "Unknown",
+    "fiveSupport": "Unknown",
+    "remaining": null
+  },
+  {
+    "name": "loading-no-value",
+    "payload": {},
+    "serviceStatus": "starting",
+    "selected": "five-hour",
+    "state": "Loading",
+    "fiveSupport": "Unknown",
+    "remaining": null
+  },
+  {
+    "name": "read-error",
+    "payload": {},
+    "serviceStatus": "fetch_error",
+    "selected": "five-hour",
+    "state": "Error",
+    "fiveSupport": "Unknown",
+    "remaining": null
+  },
+  {
+    "name": "stale-weekly",
+    "payload": {
+      "primary_window": {
+        "used_percent": 32,
+        "limit_window_seconds": 604800
+      }
+    },
+    "ageMinutes": 20,
+    "selected": "weekly",
+    "state": "Stale",
+    "fiveSupport": "Unsupported",
+    "remaining": 68
+  },
+  {
+    "name": "cached-read-error",
+    "payload": {
+      "primary_window": {
+        "used_percent": 32,
+        "limit_window_seconds": 604800
+      }
+    },
+    "serviceStatus": "fetch_error",
+    "selected": "weekly",
+    "state": "Error",
+    "fiveSupport": "Unsupported",
+    "remaining": 68
+  },
+  {
+    "name": "cached-loading",
+    "payload": {
+      "primary_window": {
+        "used_percent": 32,
+        "limit_window_seconds": 604800
+      }
+    },
+    "serviceStatus": "updating",
+    "selected": "weekly",
+    "state": "Loading",
+    "fiveSupport": "Unsupported",
+    "remaining": 68
+  },
+  {
+    "name": "old-five-preference",
+    "payload": {
+      "primary_window": {
+        "used_percent": 32,
+        "limit_window_seconds": 604800
+      }
+    },
+    "preference": "five-hour",
+    "selected": "weekly",
+    "state": "Fresh",
+    "fiveSupport": "Unsupported",
+    "remaining": 68
+  },
+  {
+    "name": "invalid-percent",
+    "payload": {
+      "primary_window": {
+        "used_percent": 150,
+        "limit_window_seconds": 604800
+      }
+    },
+    "selected": "weekly",
+    "state": "Error",
+    "fiveSupport": "Unsupported",
+    "remaining": null
+  },
+  {
+    "name": "reversed-windows",
+    "payload": {
+      "primary_window": {
+        "used_percent": 32,
+        "limit_window_seconds": 604800
+      },
+      "secondary_window": {
+        "used_percent": 13,
+        "limit_window_seconds": 18000
+      }
+    },
+    "selected": "five-hour",
+    "state": "Fresh",
+    "fiveSupport": "Supported",
+    "remaining": 87
+  },
+  {
+    "name": "unsupported-duration",
+    "payload": {
+      "primary_window": {
+        "used_percent": 11,
+        "limit_window_seconds": 86400
+      }
+    },
+    "selected": "primary",
+    "state": "Fresh",
+    "fiveSupport": "Unsupported",
+    "remaining": 89
+  },
+  {
+    "name": "quarter-hour-window",
+    "payload": {
+      "primary_window": {
+        "used_percent": 11,
+        "limit_window_seconds": 900
+      }
+    },
+    "selected": "primary",
+    "state": "Fresh",
+    "fiveSupport": "Unsupported",
+    "remaining": 89
+  },
+  {
+    "name": "fractional-not-exhausted",
+    "payload": {
+      "primary_window": {
+        "used_percent": 99.5,
+        "limit_window_seconds": 604800
+      }
+    },
+    "selected": "weekly",
+    "state": "Fresh",
+    "fiveSupport": "Unsupported",
+    "remaining": 0.5
+  },
+  {
+    "name": "future-observation",
+    "payload": {
+      "primary_window": {
+        "used_percent": 32,
+        "limit_window_seconds": 604800
+      }
+    },
+    "ageMinutes": -20,
+    "selected": "weekly",
+    "state": "Error",
+    "fiveSupport": "Unsupported",
+    "remaining": 68
+  }
+]

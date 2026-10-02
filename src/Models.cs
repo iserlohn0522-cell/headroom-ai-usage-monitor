@@ -41,6 +41,9 @@ namespace Headroom
         public string Source;
         public string Status;
         public DateTime UpdatedAt;
+        public string Plan;
+        public readonly System.Collections.Generic.List<AllowanceWindow> Windows = new System.Collections.Generic.List<AllowanceWindow>();
+        public bool HasWindowMetadata;
         public double? FiveHourUsed;
         public double? WeeklyUsed;
         public int? FiveHourRemaining = null;
@@ -102,7 +105,7 @@ namespace Headroom
 
     sealed class WidgetSettings
     {
-        public const int CurrentSettingsVersion = 2;
+        public const int CurrentSettingsVersion = 3;
 
         public int SettingsVersion = CurrentSettingsVersion;
         public int Width = 232;
@@ -117,7 +120,11 @@ namespace Headroom
         public int TextScalePercent = 100;
         public int BarHeight = 12;
         public int ActionButtonSize = 30;
-        public int BallSize = 42;
+        public int BallSize = 64;
+        public string Skin = "midnight";
+        public string BallService = "codex";
+        public string BallWindow = "auto";
+        public string ProviderManifest = "";
         public bool CollapseToBall = true;
         public bool EdgeAutoHide = true;
         public int CollapseDelayMilliseconds = 1200;
@@ -195,6 +202,10 @@ namespace Headroom
             BarHeight = other.BarHeight;
             ActionButtonSize = other.ActionButtonSize;
             BallSize = other.BallSize;
+            Skin = other.Skin;
+            BallService = other.BallService;
+            BallWindow = other.BallWindow;
+            ProviderManifest = other.ProviderManifest;
             CollapseToBall = other.CollapseToBall;
             EdgeAutoHide = other.EdgeAutoHide;
             CollapseDelayMilliseconds = other.CollapseDelayMilliseconds;

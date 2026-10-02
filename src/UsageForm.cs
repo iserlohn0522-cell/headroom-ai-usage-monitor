@@ -55,6 +55,9 @@ namespace Headroom
         Point pendingSilentWindowStart;
         bool silentDragging;
         readonly WidgetSettings settings = WidgetSettings.Load();
+        readonly List<ServiceState> customProviders = new List<ServiceState>();
+        readonly ServiceState noProviders = new ServiceState("Headroom", "", Color.Gray) { Status="no_data" };
+        readonly Dictionary<ServiceState, string> customPaths = new Dictionary<ServiceState, string>();
         readonly ToolTip toolTip = new ToolTip { InitialDelay = 2000, ReshowDelay = 100, ShowAlways = true };
         readonly Timer tooltipTimer = new Timer();
         readonly NotifyIcon trayIcon = new NotifyIcon();
@@ -114,6 +117,8 @@ namespace Headroom
         public UsageForm()
         {
             Text = "Headroom";
+            if (!string.IsNullOrWhiteSpace(HeadroomOptions.ProviderManifest)) settings.ProviderManifest=Path.GetFullPath(HeadroomOptions.ProviderManifest);
+            LoadCustomProviders();
             AutoScaleMode = AutoScaleMode.None;
             Width = settings.Width;
             Height = settings.Height;
@@ -275,6 +280,7 @@ namespace Headroom
 
         void RenderLayered()
         {
+            if(collapsedToBall && Size!=FloatingSize()) ResizeCollapsedBallForCurrentDpi();
             if (!Visible || !IsHandleCreated || Width <= 0 || Height <= 0) return;
             IntPtr screenDC = GetDC(IntPtr.Zero);
             IntPtr memDC    = CreateCompatibleDC(screenDC);
@@ -318,6 +324,9 @@ namespace Headroom
 
             if (settings.ShowCodex)  await MaybeRefreshAsync(codex);
             if (settings.ShowClaude) await MaybeRefreshAsync(claude);
+            foreach (var custom in customProviders) RefreshCustomProvider(custom);
+            if (!collapsedToBall) ApplyIdealSize();
+            if (!trayMenu.Visible) SetupTrayIcon();
         }
 
         async Task MaybeRefreshAsync(ServiceState service)
@@ -372,7 +381,10 @@ namespace Headroom
             var tasks = new List<Task>();
             if (settings.ShowCodex)  tasks.Add(RefreshServiceAsync(codex, manual));
             if (settings.ShowClaude) tasks.Add(RefreshServiceAsync(claude, manual));
+            foreach (var custom in customProviders) RefreshCustomProvider(custom);
             await Task.WhenAll(tasks);
+            if (!collapsedToBall) ApplyIdealSize();
+            if (!trayMenu.Visible) SetupTrayIcon();
         }
 
         async Task RefreshServiceAsync(ServiceState service, bool manual)
@@ -421,6 +433,14 @@ namespace Headroom
                 service.Data = parser(json);
                 service.Data.Name = name;
                 service.Data.Source = "Fixture";
+            }
+            var fixtureRoot=Json.ParseObject(json);
+            var metadata=Json.Object(fixtureRoot,"_headroom");
+            if (metadata!=null) {
+                string status=Json.String(metadata,"status");
+                if (status=="fetch_error" || status=="updating" || status=="starting") service.Data.Status=status;
+                DateTimeOffset observed;
+                if (DateTimeOffset.TryParse(Json.String(metadata,"observedAt"),out observed)) service.Data.UpdatedAt=observed.LocalDateTime;
             }
             service.Status = service.Data.Status;
             service.RateLimitedUntil = null;
@@ -599,6 +619,7 @@ namespace Headroom
 
         void SetupCredentialWatchers()
         {
+            if (!settings.ShowClaude && !settings.ShowCodex) return;
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             try
             {
@@ -667,6 +688,7 @@ namespace Headroom
 
         void OnClaudeCredentialChanged()
         {
+            if (!settings.ShowClaude) return;
             if ((DateTime.Now - lastClaudeCredNotify).TotalSeconds < 1) return;
             lastClaudeCredNotify = DateTime.Now;
             try
@@ -685,6 +707,7 @@ namespace Headroom
 
         void OnCodexCredentialChanged()
         {
+            if (!settings.ShowCodex) return;
             if ((DateTime.Now - lastCodexCredNotify).TotalSeconds < 1) return;
             lastCodexCredNotify = DateTime.Now;
             try
@@ -868,6 +891,7 @@ namespace Headroom
             behaviorMenu.DropDownItems.Add(edgeHideItem);
             trayMenu.Items.Add(behaviorMenu);
 
+            AddAllowanceMenus();
             var languageMenu = new ToolStripMenuItem(T("语言", "Language"));
             var chineseItem = new ToolStripMenuItem("简体中文") { Checked = !English };
             chineseItem.Click += (s, e) => SetLanguage("zh-CN");
@@ -885,6 +909,7 @@ namespace Headroom
             if (trayIcon.Icon == null)
                 trayIcon.Icon = Icon ?? SystemIcons.Application;
             trayIcon.ContextMenuStrip = trayMenu;
+            ContextMenuStrip = trayMenu;
             trayIcon.Visible = true;
         }
 
@@ -912,11 +937,7 @@ namespace Headroom
         {
             if (service == "Claude") settings.ShowClaude = visible;
             else settings.ShowCodex = visible;
-            if (!settings.ShowClaude && !settings.ShowCodex)
-            {
-                if (service == "Claude") settings.ShowCodex = true;
-                else settings.ShowClaude = true;
-            }
+            if (visible && !HeadroomOptions.FixtureMode) SetupCredentialWatchers();
             ApplyIdealSize();
             settings.Save();
             SetupTrayIcon();

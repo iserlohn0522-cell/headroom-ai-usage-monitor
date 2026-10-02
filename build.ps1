@@ -92,6 +92,7 @@ New-Item -ItemType Directory -Force -Path $VersionInfoDir | Out-Null
   /p:Platform=x64 `
   /p:OutDir="$Out\" `
   /p:AssemblyName="$AssemblyName" `
+  /p:IntermediateOutputPath="$VersionInfoDir\$AssemblyName\" `
   /p:HeadroomVersionInfoFile="$VersionInfoFile" `
   /p:FrameworkPathOverride="$ReferenceAssemblies"
 if ($LASTEXITCODE -ne 0) {

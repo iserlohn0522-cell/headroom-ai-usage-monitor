@@ -11,6 +11,7 @@ namespace Headroom
             try
             {
                 ParserTests.Run(root);
+                AllowanceTests.Run(root);
                 CredentialStoreTests.Run(root);
                 RefreshPolicyTests.Run(root);
                 SettingsStoreTests.Run(root);
