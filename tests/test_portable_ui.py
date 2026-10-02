@@ -46,6 +46,9 @@ class PortableUiTests(unittest.TestCase):
                     if after==(before[0]+20,before[1]+20):break
                     time.sleep(.01)
                 self.assertEqual(after,(before[0]+20,before[1]+20))
+            # Restore the initial withdrawn state before the timer-only hover check;
+            # a real pointer Leave after repositioning must not cancel that timer.
+            root.withdraw();root.update()
 
             app.set_pref("skin","paper"); app.set_pref("language","en"); app.choose_ball("demo-plan","five-hour")
             self.assertEqual(select(app.snapshots,app.settings).fallback,"preferred-unavailable")
